@@ -8,7 +8,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "LINE OA Stock Management",
+  title: "mini stock",
   description: "ระบบจัดการสต๊อกสินค้า LINE OA"
 };
 

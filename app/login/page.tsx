@@ -27,19 +27,7 @@ export default function LoginPage() {
   };
 
   const loginWithLine = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=/portal/dashboard`;
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "line" as never,
-        options: { redirectTo }
-      });
-      if (oauthError) setError(oauthError.message);
-    } finally {
-      setLoading(false);
-    }
+    window.location.href = "/api/auth/line/login";
   };
 
   return (
