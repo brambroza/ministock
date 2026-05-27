@@ -9,7 +9,7 @@ const theme = createTheme({
     secondary: { main: "#0f172a" },
     background: { default: "#f5f7fb" }
   },
-  shape: { borderRadius: 12 },
+  shape: { borderRadius: 2 },
   typography: {
     fontFamily: "Kanit, sans-serif"
   }
