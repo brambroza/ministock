@@ -109,7 +109,29 @@ export async function GET(req: NextRequest) {
   }
 
   if (!resolvedProfile?.auth_user_id) {
-    return NextResponse.redirect(`${req.nextUrl.origin}/liff/request-access?reason=unlinked`);
+    const res = NextResponse.redirect(`${req.nextUrl.origin}/login?reason=unlinked`);
+    res.cookies.set("pending_line_user_id", lineProfile.userId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600
+    });
+    res.cookies.set("pending_line_display_name", lineProfile.displayName, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600
+    });
+    res.cookies.set("pending_line_picture_url", lineProfile.pictureUrl ?? "", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600
+    });
+    return res;
   }
 
   await supabaseAdmin

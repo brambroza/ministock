@@ -1,14 +1,34 @@
 "use client";
 
 import { Alert, Box, Button, Card, CardContent, Divider, Stack, TextField, Typography } from "@mui/material";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const reason = searchParams.get("reason");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const registerWithEmail = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const supabase = createClient();
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+      alert("สมัครสมาชิกสำเร็จ กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี (ถ้าระบบเปิดยืนยันอีเมล)");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loginWithEmail = async () => {
     setLoading(true);
@@ -20,6 +40,12 @@ export default function LoginPage() {
         setError(signInError.message);
         return;
       }
+
+      // If user came from LINE unlinked flow, bind pending LINE profile once.
+      if (reason === "unlinked") {
+        await fetch("/api/auth/line/link-pending", { method: "POST" });
+      }
+
       location.href = "/portal/dashboard";
     } finally {
       setLoading(false);
@@ -38,6 +64,9 @@ export default function LoginPage() {
             <Typography variant="h5" fontWeight={700}>เข้าสู่ระบบ</Typography>
             <Typography color="text.secondary">รองรับทั้ง LINE และอีเมล/รหัสผ่าน</Typography>
 
+            {reason === "unlinked" ? (
+              <Alert severity="warning">บัญชี LINE ยังไม่ถูกผูกกับระบบ กรุณาเข้าสู่ระบบด้วยอีเมล 1 ครั้งเพื่อผูกบัญชีอัตโนมัติ</Alert>
+            ) : null}
             {error ? <Alert severity="error">{error}</Alert> : null}
 
             <Button size="large" variant="contained" onClick={loginWithLine} disabled={loading}>
@@ -50,6 +79,9 @@ export default function LoginPage() {
             <TextField type="password" label="รหัสผ่าน" value={password} onChange={(e) => setPassword(e.target.value)} />
             <Button size="large" variant="outlined" onClick={loginWithEmail} disabled={loading}>
               เข้าสู่ระบบด้วยอีเมล
+            </Button>
+            <Button size="large" variant="text" onClick={registerWithEmail} disabled={loading}>
+              สมัครสมาชิกด้วยอีเมล
             </Button>
           </Stack>
         </CardContent>
