@@ -9,10 +9,11 @@ import {
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Divider,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Typography
 } from "@mui/material";
@@ -38,6 +39,8 @@ type LocationOption = { id: string; location_code: string; location_name: string
 export default function Page() {
   const [barcode, setBarcode] = useState("");
   const [scannerOpen, setScannerOpen] = useState(true);
+  const [isLineBrowser, setIsLineBrowser] = useState(false);
+  const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [tab, setTab] = useState<"receive" | "create">("receive");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
@@ -61,6 +64,7 @@ export default function Page() {
   });
 
   useEffect(() => {
+    setIsLineBrowser(/Line\//i.test(navigator.userAgent));
     Promise.all([
       fetch("/api/units", { cache: "no-store" }).then((r) => r.json()),
       fetch("/api/locations", { cache: "no-store" }).then((r) => r.json())
@@ -97,10 +101,12 @@ export default function Page() {
       }
 
       setReceive((s) => ({ ...s, unit_cost: p.cost ?? 0 }));
+      setModeDialogOpen(true);
     } else {
       setFoundProduct(null);
       setTab("create");
       setCreateForm((s) => ({ ...s, product_name: "" }));
+      setModeDialogOpen(true);
     }
   }, [locations]);
 
@@ -182,6 +188,44 @@ export default function Page() {
 
   return (
     <Stack spacing={1.5}>
+      <Dialog
+        open={modeDialogOpen}
+        onClose={() => setModeDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 4, p: 0.5 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 0.5 }}>เลือกการทำงาน</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.2}>
+            <Button
+              variant={tab === "receive" ? "contained" : "outlined"}
+              size="large"
+              startIcon={<AddShoppingCartRoundedIcon />}
+              onClick={() => {
+                setTab("receive");
+                setModeDialogOpen(false);
+              }}
+              sx={{ borderRadius: 3, justifyContent: "flex-start", py: 1.2 }}
+            >
+              รับเข้าสต๊อก
+            </Button>
+            <Button
+              variant={tab === "create" ? "contained" : "outlined"}
+              size="large"
+              startIcon={<Inventory2RoundedIcon />}
+              onClick={() => {
+                setTab("create");
+                setModeDialogOpen(false);
+              }}
+              sx={{ borderRadius: 3, justifyContent: "flex-start", py: 1.2 }}
+            >
+              เพิ่มสินค้าใหม่
+            </Button>
+          </Stack>
+        </DialogContent>
+      </Dialog>
+
       <Card elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3 }}>
         <CardContent>
           <Stack spacing={1.2}>
@@ -194,6 +238,9 @@ export default function Page() {
                 {scannerOpen ? "ซ่อนสแกนเนอร์" : "เปิดสแกนเนอร์"}
               </Button>
             </Stack>
+            <Button variant="outlined" onClick={() => setModeDialogOpen(true)} sx={{ borderRadius: 2.5 }}>
+              เลือกโหมดการทำงาน
+            </Button>
             <TextField label="บาร์โค้ด / QR Code" value={barcode} onChange={(e) => setBarcode(e.target.value)} fullWidth />
             {scannerOpen ? <BarcodeScanner onDetected={detectBarcode} /> : null}
           </Stack>
@@ -216,26 +263,41 @@ export default function Page() {
 
       <Card elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3 }}>
         <CardContent>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth">
-            <Tab value="receive" label="รับเข้าสต๊อก" icon={<AddShoppingCartRoundedIcon />} iconPosition="start" />
-            <Tab value="create" label="เพิ่มสินค้าใหม่" icon={<Inventory2RoundedIcon />} iconPosition="start" />
-          </Tabs>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography fontWeight={700}>{tab === "receive" ? "รับเข้าสต๊อก" : "เพิ่มสินค้าใหม่"}</Typography>
+            <Button size="small" onClick={() => setModeDialogOpen(true)}>เปลี่ยนโหมด</Button>
+          </Stack>
 
-          <Divider sx={{ my: 2 }} />
+          <Divider sx={{ my: 1.5 }} />
 
           {tab === "receive" ? (
             <Stack spacing={1.2}>
               <Alert severity="info">ใช้สำหรับเพิ่มจำนวนสต๊อกจาก Barcode/QR ที่สแกนได้</Alert>
               <TextField label="สินค้า" value={foundProduct?.product_name ?? "ยังไม่พบสินค้า"} fullWidth disabled />
 
-              <Autocomplete
-                options={locations}
-                value={selectedLocation}
-                onChange={(_, value) => setSelectedLocation(value)}
-                getOptionLabel={(o) => `${o.location_code} - ${o.location_name}`}
-                isOptionEqualToValue={(a, b) => a.id === b.id}
-                renderInput={(params) => <TextField {...params} label="คลังสินค้า" />}
-              />
+              {isLineBrowser ? (
+                <TextField
+                  select
+                  label="คลังสินค้า"
+                  value={selectedLocation?.id ?? ""}
+                  onChange={(e) => setSelectedLocation(locations.find((x) => x.id === e.target.value) ?? null)}
+                  SelectProps={{ native: true }}
+                  fullWidth
+                >
+                  <option value="">เลือกคลังสินค้า</option>
+                  {locations.map((o) => <option key={o.id} value={o.id}>{o.location_code} - {o.location_name}</option>)}
+                </TextField>
+              ) : (
+                <Autocomplete
+                  disablePortal
+                  options={locations}
+                  value={selectedLocation}
+                  onChange={(_, value) => setSelectedLocation(value)}
+                  getOptionLabel={(o) => `${o.location_code} - ${o.location_name}`}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  renderInput={(params) => <TextField {...params} label="คลังสินค้า" />}
+                />
+              )}
 
               <Stack direction="row" spacing={1}>
                 <TextField label="จำนวนรับเข้า" type="number" value={receive.qty} onChange={(e) => setReceive((s) => ({ ...s, qty: Number(e.target.value) }))} fullWidth />
@@ -255,29 +317,67 @@ export default function Page() {
               <TextField label="บาร์โค้ด" value={barcode} onChange={(e) => setBarcode(e.target.value)} fullWidth />
               <TextField label="ชื่อสินค้า" value={createForm.product_name} onChange={(e) => setCreateForm((s) => ({ ...s, product_name: e.target.value }))} fullWidth />
 
-              <Autocomplete
-                options={units}
-                value={selectedUnit}
-                onChange={(_, value) => {
-                  setSelectedUnit(value);
-                  setCreateForm((s) => ({ ...s, unit_id: value?.id ?? "" }));
-                }}
-                getOptionLabel={(o) => `${o.unit_code} - ${o.unit_name}`}
-                isOptionEqualToValue={(a, b) => a.id === b.id}
-                renderInput={(params) => <TextField {...params} label="หน่วยนับ" />}
-              />
+              {isLineBrowser ? (
+                <TextField
+                  select
+                  label="หน่วยนับ"
+                  value={createForm.unit_id}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setCreateForm((s) => ({ ...s, unit_id: nextId }));
+                    setSelectedUnit(units.find((x) => x.id === nextId) ?? null);
+                  }}
+                  SelectProps={{ native: true }}
+                  fullWidth
+                >
+                  <option value="">เลือกหน่วยนับ</option>
+                  {units.map((o) => <option key={o.id} value={o.id}>{o.unit_code} - {o.unit_name}</option>)}
+                </TextField>
+              ) : (
+                <Autocomplete
+                  disablePortal
+                  options={units}
+                  value={selectedUnit}
+                  onChange={(_, value) => {
+                    setSelectedUnit(value);
+                    setCreateForm((s) => ({ ...s, unit_id: value?.id ?? "" }));
+                  }}
+                  getOptionLabel={(o) => `${o.unit_code} - ${o.unit_name}`}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  renderInput={(params) => <TextField {...params} label="หน่วยนับ" />}
+                />
+              )}
 
-              <Autocomplete
-                options={locations}
-                value={selectedLocation}
-                onChange={(_, value) => {
-                  setSelectedLocation(value);
-                  setCreateForm((s) => ({ ...s, storage_location_id: value?.id ?? "" }));
-                }}
-                getOptionLabel={(o) => `${o.location_code} - ${o.location_name}`}
-                isOptionEqualToValue={(a, b) => a.id === b.id}
-                renderInput={(params) => <TextField {...params} label="คลังเริ่มต้น" />}
-              />
+              {isLineBrowser ? (
+                <TextField
+                  select
+                  label="คลังเริ่มต้น"
+                  value={createForm.storage_location_id}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setCreateForm((s) => ({ ...s, storage_location_id: nextId }));
+                    setSelectedLocation(locations.find((x) => x.id === nextId) ?? null);
+                  }}
+                  SelectProps={{ native: true }}
+                  fullWidth
+                >
+                  <option value="">เลือกคลังเริ่มต้น</option>
+                  {locations.map((o) => <option key={o.id} value={o.id}>{o.location_code} - {o.location_name}</option>)}
+                </TextField>
+              ) : (
+                <Autocomplete
+                  disablePortal
+                  options={locations}
+                  value={selectedLocation}
+                  onChange={(_, value) => {
+                    setSelectedLocation(value);
+                    setCreateForm((s) => ({ ...s, storage_location_id: value?.id ?? "" }));
+                  }}
+                  getOptionLabel={(o) => `${o.location_code} - ${o.location_name}`}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  renderInput={(params) => <TextField {...params} label="คลังเริ่มต้น" />}
+                />
+              )}
 
               <Stack direction="row" spacing={1}>
                 <TextField label="ต้นทุน" type="number" value={createForm.cost} onChange={(e) => setCreateForm((s) => ({ ...s, cost: Number(e.target.value) }))} fullWidth />

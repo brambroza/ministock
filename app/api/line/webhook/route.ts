@@ -20,7 +20,16 @@ function verifySignature(rawBody: string, signature: string | null) {
   return timingSafeEqual(a, b);
 }
 
-async function replyMessage(replyToken: string, text: string) {
+function defaultQuickReplyItems() {
+  return [
+    { type: "action", action: { type: "message", label: "สินค้าคงเหลือ", text: "สินค้าคงเหลือ" } },
+    { type: "action", action: { type: "message", label: "สินค้าต้องซื้อ", text: "สินค้าต้องซื้อ" } },
+    { type: "action", action: { type: "message", label: "สรุปยอดคงเหลือ", text: "สรุปยอดคงเหลือ" } },
+    { type: "action", action: { type: "message", label: "สรุปยอดซื้อต่อเดือน", text: "สรุปยอดซื้อต่อเดือน" } }
+  ];
+}
+
+async function replyMessage(replyToken: string, text: string, withQuickReply = true) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token) return;
 
@@ -32,7 +41,13 @@ async function replyMessage(replyToken: string, text: string) {
     },
     body: JSON.stringify({
       replyToken,
-      messages: [{ type: "text", text }]
+      messages: [
+        {
+          type: "text",
+          text,
+          ...(withQuickReply ? { quickReply: { items: defaultQuickReplyItems() } } : {})
+        }
+      ]
     })
   });
 }
@@ -188,10 +203,7 @@ export async function POST(req: NextRequest) {
     const profile = await getCompanyByLineUserId(event.source.userId);
 
     if (!profile?.company_id) {
-      await replyMessage(
-        event.replyToken,
-        "ไม่พบสิทธิ์ใช้งานระบบ กรุณาเปิด LIFF และผูกบัญชีผู้ใช้ก่อน"
-      );
+      await replyMessage(event.replyToken, "ไม่พบสิทธิ์ใช้งานระบบ กรุณาเปิด LIFF และผูกบัญชีผู้ใช้ก่อน");
       continue;
     }
 
