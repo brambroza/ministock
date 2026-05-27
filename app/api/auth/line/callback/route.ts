@@ -207,7 +207,7 @@ export async function GET(req: NextRequest) {
     type: "magiclink",
     email: targetEmail,
     options: {
-      redirectTo: `${appUrl}/portal/dashboard`
+      redirectTo: `${appUrl}/auth/complete`
     }
   });
 
