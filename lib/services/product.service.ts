@@ -1,11 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { productSchema } from "@/lib/validators/schemas";
 import { AuditService } from "@/lib/services/audit.service";
+import { getCurrentActor } from "@/lib/auth/actor";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const ProductService = {
   async getProducts(query?: { name?: string; barcode?: string }) {
-    const supabase = await createClient();
+    const actor = await getCurrentActor();
+    const supabase = actor ? supabaseAdmin : await createClient();
     let q = supabase.from("products").select("*").eq("is_deleted", false).order("created_at", { ascending: false });
+    if (actor) q = q.eq("company_id", actor.companyId);
     if (query?.name) q = q.ilike("product_name", `%${query.name}%`);
     if (query?.barcode) q = q.ilike("barcode", `%${query.barcode}%`);
     return q;
@@ -16,21 +20,20 @@ export const ProductService = {
   },
   async createProduct(input: unknown) {
     const payload = productSchema.parse(input);
-    const supabase = await createClient();
-    const user = (await supabase.auth.getUser()).data.user;
-    const { data: profile } = await supabase.from("user_profiles").select("id, company_id").eq("auth_user_id", user?.id).single();
-    const { data, error } = await supabase.from("products").insert({ ...payload, company_id: profile?.company_id, created_by: profile?.id, updated_by: profile?.id }).select("*").single();
+    const actor = await getCurrentActor();
+    if (!actor) throw new Error("Unauthorized");
+    const { data, error } = await supabaseAdmin.from("products").insert({ ...payload, company_id: actor.companyId, created_by: actor.profileId, updated_by: actor.profileId }).select("*").single();
     if (error) throw error;
     if ((payload.opening_balance ?? 0) > 0) {
-      await supabase.from("stock_movements").insert({
-        company_id: profile?.company_id,
+      await supabaseAdmin.from("stock_movements").insert({
+        company_id: actor.companyId,
         product_id: data.id,
         location_id: payload.storage_location_id,
         movement_type: "OPENING",
         qty_in: payload.opening_balance,
         unit_cost: payload.cost,
-        created_by: profile?.id,
-        updated_by: profile?.id
+        created_by: actor.profileId,
+        updated_by: actor.profileId
       });
     }
     await AuditService.logAction({ action: "CREATE", table_name: "products", record_id: data.id, new_data: data });

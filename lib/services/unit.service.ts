@@ -1,67 +1,51 @@
 import { createClient } from "@/lib/supabase/server";
 import { unitSchema } from "@/lib/validators/schemas";
+import { getCurrentActor } from "@/lib/auth/actor";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const UnitService = {
   async getUnits() {
-    const supabase = await createClient();
-    return supabase.from("units").select("*").eq("is_deleted", false).order("unit_name");
+    const actor = await getCurrentActor();
+    const supabase = actor ? supabaseAdmin : await createClient();
+    let q = supabase.from("units").select("*").eq("is_deleted", false).order("unit_name");
+    if (actor) q = q.eq("company_id", actor.companyId);
+    return q;
   },
   async createUnit(input: unknown) {
     const payload = unitSchema.parse(input);
-    const supabase = await createClient();
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) throw new Error("กรุณาเข้าสู่ระบบก่อนใช้งาน");
+    const actor = await getCurrentActor();
+    if (!actor) throw new Error("กรุณาเข้าสู่ระบบก่อนใช้งาน");
 
-    const { data: profile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("id, company_id")
-      .eq("auth_user_id", user.id)
-      .single();
-
-    if (profileError || !profile?.company_id) {
-      throw new Error("ไม่พบข้อมูลบริษัทของผู้ใช้งาน");
-    }
-
-    return supabase
+    return supabaseAdmin
       .from("units")
       .insert({
         ...payload,
-        company_id: profile.company_id,
-        created_by: profile.id,
-        updated_by: profile.id
+        company_id: actor.companyId,
+        created_by: actor.profileId,
+        updated_by: actor.profileId
       })
       .select("*")
       .single();
   },
   async updateUnit(id: string, input: unknown) {
     const payload = unitSchema.partial().parse(input);
-    const supabase = await createClient();
-    const user = (await supabase.auth.getUser()).data.user;
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("id")
-      .eq("auth_user_id", user?.id)
-      .single();
+    const actor = await getCurrentActor();
+    if (!actor) throw new Error("Unauthorized");
 
-    return supabase
+    return supabaseAdmin
       .from("units")
-      .update({ ...payload, updated_by: profile?.id })
-      .eq("id", id)
+      .update({ ...payload, updated_by: actor.profileId })
+      .eq("id", id).eq("company_id", actor.companyId)
       .select("*")
       .single();
   },
   async softDeleteUnit(id: string) {
-    const supabase = await createClient();
-    const user = (await supabase.auth.getUser()).data.user;
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("id")
-      .eq("auth_user_id", user?.id)
-      .single();
+    const actor = await getCurrentActor();
+    if (!actor) throw new Error("Unauthorized");
 
-    return supabase
+    return supabaseAdmin
       .from("units")
-      .update({ is_deleted: true, active: false, updated_by: profile?.id })
-      .eq("id", id);
+      .update({ is_deleted: true, active: false, updated_by: actor.profileId })
+      .eq("id", id).eq("company_id", actor.companyId);
   }
 };
