@@ -2,7 +2,6 @@
 
 import { Alert, Box, Button, Card, CardContent, Divider, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const [reason, setReason] = useState<string | null>(null);
@@ -20,10 +19,15 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        setError(signInError.message);
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!loginRes.ok) {
+        const data = await loginRes.json();
+        setError(data?.error ?? "เข้าสู่ระบบไม่สำเร็จ");
         return;
       }
 
@@ -41,13 +45,30 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
-      if (signUpError) {
-        setError(signUpError.message);
+      const registerRes = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password, display_name: email })
+      });
+
+      if (!registerRes.ok) {
+        const data = await registerRes.json();
+        setError(data?.error ?? "สมัครสมาชิกไม่สำเร็จ");
         return;
       }
-      alert("สมัครสมาชิกสำเร็จ กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี (ถ้าระบบเปิดยืนยันอีเมล)");
+
+      // Auto login after successful registration
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (!loginRes.ok) {
+        const data = await loginRes.json();
+        setError(data?.error ?? "เข้าสู่ระบบไม่สำเร็จ");
+        return;
+      }
+      location.href = "/portal/dashboard";
     } finally {
       setLoading(false);
     }

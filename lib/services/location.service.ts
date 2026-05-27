@@ -49,5 +49,19 @@ export const LocationService = {
       .eq("id", id)
       .select("*")
       .single();
+  },
+  async softDeleteLocation(id: string) {
+    const supabase = await createClient();
+    const user = (await supabase.auth.getUser()).data.user;
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("id")
+      .eq("auth_user_id", user?.id)
+      .single();
+
+    return supabase
+      .from("storage_locations")
+      .update({ is_deleted: true, active: false, updated_by: profile?.id })
+      .eq("id", id);
   }
 };

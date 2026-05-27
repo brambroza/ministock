@@ -39,7 +39,6 @@ import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 type NotificationItem = {
   id: string;
@@ -122,8 +121,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
   const notificationLabel = useMemo(() => `แจ้งเตือน ${unreadCount} รายการ`, [unreadCount]);
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   };

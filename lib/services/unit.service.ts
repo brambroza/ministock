@@ -49,5 +49,19 @@ export const UnitService = {
       .eq("id", id)
       .select("*")
       .single();
+  },
+  async softDeleteUnit(id: string) {
+    const supabase = await createClient();
+    const user = (await supabase.auth.getUser()).data.user;
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("id")
+      .eq("auth_user_id", user?.id)
+      .single();
+
+    return supabase
+      .from("units")
+      .update({ is_deleted: true, active: false, updated_by: profile?.id })
+      .eq("id", id);
   }
 };
