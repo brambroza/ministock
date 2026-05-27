@@ -7,15 +7,39 @@ import liff from "@line/liff";
 
 export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const onDetectedRef = useRef(onDetected);
   const lastDetectedRef = useRef<{ value: string; at: number } | null>(null);
 
   const [manual, setManual] = useState("");
   const [cameraError, setCameraError] = useState<string>("");
 
   useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, [onDetected]);
+
+  useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     let controls: { stop: () => void } | undefined;
     let unmounted = false;
+
+    const applyFocusConstraints = async () => {
+      const video = videoRef.current;
+      const mediaStream = video?.srcObject;
+      if (!(mediaStream instanceof MediaStream)) return;
+      const [track] = mediaStream.getVideoTracks();
+      if (!track) return;
+
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
+        });
+      } catch {
+        // Some LINE browser / devices do not support focusMode.
+      }
+    };
 
     const start = async () => {
       if (!videoRef.current) return;
@@ -29,8 +53,9 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
           if (last && last.value === text && now - last.at < 1500) return;
 
           lastDetectedRef.current = { value: text, at: now };
-          onDetected(text);
+          onDetectedRef.current(text);
         });
+        await applyFocusConstraints();
       } catch {
         if (!unmounted) setCameraError("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตสิทธิ์กล้อง หรือใช้ปุ่มสแกน LIFF");
       }
@@ -42,7 +67,7 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
       unmounted = true;
       if (controls?.stop) controls.stop();
     };
-  }, [onDetected]);
+  }, []);
 
   const scanLiff = async () => {
     try {
@@ -56,7 +81,14 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
   return (
     <Stack spacing={1.2}>
       <Button variant="contained" onClick={scanLiff}>สแกนด้วย LIFF (QR/2D)</Button>
-      <Box component="video" ref={videoRef} sx={{ width: "100%", borderRadius: 2, bgcolor: "black", minHeight: 220 }} />
+      <Box
+        component="video"
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        sx={{ width: "100%", borderRadius: 2, bgcolor: "black", minHeight: 220, objectFit: "cover" }}
+      />
       {cameraError ? <Alert severity="warning">{cameraError}</Alert> : null}
       <Typography variant="body2" color="text.secondary">รองรับ Barcode 1D และ QR Code (fallback กรอกเอง)</Typography>
       <Stack direction="row" spacing={1}>

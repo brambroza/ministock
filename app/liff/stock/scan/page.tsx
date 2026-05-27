@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Autocomplete,
@@ -75,7 +75,7 @@ export default function Page() {
 
   const locationId = useMemo(() => selectedLocation?.id ?? "", [selectedLocation]);
 
-  const detectBarcode = async (value: string) => {
+  const detectBarcode = useCallback(async (value: string) => {
     const code = value.trim();
     if (!code) return;
 
@@ -102,7 +102,7 @@ export default function Page() {
       setTab("create");
       setCreateForm((s) => ({ ...s, product_name: "" }));
     }
-  };
+  }, [locations]);
 
   const submitReceive = async () => {
     if (!foundProduct) return;

@@ -288,12 +288,12 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
           left: 12,
           right: 12,
           bottom: 10,
-          borderRadius: 999,
+          borderRadius: 1,
           overflow: "hidden",
           display: { xs: "block", md: "none" }
         }}
       >
-        <BottomNavigation showLabels value={pathname} sx={{ height: 64 }}>
+        <BottomNavigation showLabels value={pathname} sx={{ height: 64    }}>
           {mobileMenus.map((menu) => (
             <BottomNavigationAction
               key={menu.href}
