@@ -1,34 +1,20 @@
 "use client";
 
 import { Alert, Box, Button, Card, CardContent, Divider, Stack, TextField, Typography } from "@mui/material";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const searchParams = useSearchParams();
-  const reason = searchParams.get("reason");
-
+  const [reason, setReason] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const registerWithEmail = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
-      if (signUpError) {
-        setError(signUpError.message);
-        return;
-      }
-      alert("สมัครสมาชิกสำเร็จ กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี (ถ้าระบบเปิดยืนยันอีเมล)");
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get("reason");
+    setReason(r);
+  }, []);
 
   const loginWithEmail = async () => {
     setLoading(true);
@@ -41,12 +27,27 @@ export default function LoginPage() {
         return;
       }
 
-      // If user came from LINE unlinked flow, bind pending LINE profile once.
       if (reason === "unlinked") {
         await fetch("/api/auth/line/link-pending", { method: "POST" });
       }
 
       location.href = "/portal/dashboard";
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const registerWithEmail = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const supabase = createClient();
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+      alert("สมัครสมาชิกสำเร็จ กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี (ถ้าระบบเปิดยืนยันอีเมล)");
     } finally {
       setLoading(false);
     }
