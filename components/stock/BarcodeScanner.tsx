@@ -14,6 +14,8 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
   const [manual, setManual] = useState("");
   const [cameraError, setCameraError] = useState<string>("");
   const [liffReady, setLiffReady] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [usingRear, setUsingRear] = useState(true);
 
   useEffect(() => {
     onDetectedRef.current = onDetected;
@@ -57,7 +59,6 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
         }
 
         await track.applyConstraints({
-          facingMode: { ideal: "environment" },
           advanced,
           width: { ideal: 1920 },
           height: { ideal: 1080 },
@@ -71,11 +72,16 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
     const start = async () => {
       if (!videoRef.current) return;
       try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        const rearCam = devices.find((d) => /back|rear|environment|หลัง/i.test(d.label));
-        const deviceId = rearCam?.deviceId ?? devices[0]?.deviceId;
-
-        controls = await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result) => {
+        controls = await reader.decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: usingRear ? "environment" : "user" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
+          },
+          videoRef.current,
+          (result) => {
           const text = result?.getText()?.trim();
           if (!text) return;
 
@@ -85,8 +91,21 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
 
           lastDetectedRef.current = { value: text, at: now };
           onDetectedRef.current(text);
-        });
+          }
+        );
         await applyFocusConstraints();
+
+        const refocusTimer = setInterval(() => {
+          void applyFocusConstraints();
+        }, 1800);
+
+        const oldStop = controls?.stop?.bind(controls);
+        if (oldStop) {
+          controls.stop = () => {
+            clearInterval(refocusTimer);
+            oldStop();
+          };
+        }
       } catch {
         if (!unmounted) setCameraError("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตสิทธิ์กล้อง หรือใช้ปุ่มสแกน LIFF");
       }
@@ -98,7 +117,7 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
       unmounted = true;
       if (controls?.stop) controls.stop();
     };
-  }, []);
+  }, [usingRear]);
 
   useEffect(() => {
     const checkLiff = async () => {
@@ -124,9 +143,30 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
     }
   };
 
+  const toggleTorch = async () => {
+    const mediaStream = videoRef.current?.srcObject;
+    if (!(mediaStream instanceof MediaStream)) return;
+    const [track] = mediaStream.getVideoTracks();
+    if (!track) return;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: !torchOn } as unknown as MediaTrackConstraintSet]
+      });
+      setTorchOn((s) => !s);
+    } catch {
+      setCameraError("อุปกรณ์นี้ไม่รองรับไฟแฟลชผ่านเบราว์เซอร์");
+    }
+  };
+
   return (
     <Stack spacing={1.2}>
       <Button variant="contained" onClick={scanLiff} disabled={!liffReady}>สแกนด้วย LIFF (QR/2D)</Button>
+      <Stack direction="row" spacing={1}>
+        <Button variant="outlined" onClick={() => setUsingRear((s) => !s)}>
+          {usingRear ? "สลับกล้องหน้า" : "สลับกล้องหลัง"}
+        </Button>
+        <Button variant="outlined" onClick={toggleTorch}>{torchOn ? "ปิดไฟแฟลช" : "เปิดไฟแฟลช"}</Button>
+      </Stack>
       <Typography variant="body2" color="text.secondary">กล้องเริ่มสแกนอัตโนมัติทันทีเมื่อเปิดหน้านี้</Typography>
       <Box
         component="video"
@@ -134,7 +174,7 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
         autoPlay
         muted
         playsInline
-        sx={{ width: "100%", borderRadius: 2, bgcolor: "black", minHeight: 220, objectFit: "cover" }}
+        sx={{ width: "100%", borderRadius: 2, bgcolor: "black", minHeight: 220, objectFit: "contain" }}
       />
       {cameraError ? <Alert severity="warning">{cameraError}</Alert> : null}
       <Typography variant="body2" color="text.secondary">รองรับ Barcode 1D และ QR Code (fallback กรอกเอง)</Typography>
