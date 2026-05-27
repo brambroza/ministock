@@ -59,6 +59,7 @@ export default function Page() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanCode, setScanCode] = useState("");
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
+  const [formErrors, setFormErrors] = useState<{ product_id?: string; location_id?: string; quantity?: string }>({});
   const [savingCreate, setSavingCreate] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -149,8 +150,14 @@ export default function Page() {
   };
 
   const createIssue = async () => {
-    if (!form.product_id || !form.location_id || Number(form.quantity) <= 0) {
-      setSnack({ open: true, message: "กรุณากรอกสินค้า คลัง และจำนวนให้ครบ", severity: "warning" });
+    const nextErrors: { product_id?: string; location_id?: string; quantity?: string } = {};
+    if (!form.product_id) nextErrors.product_id = "กรุณาเลือกสินค้า";
+    if (!form.location_id) nextErrors.location_id = "กรุณาเลือกคลัง";
+    if (!Number.isFinite(Number(form.quantity)) || Number(form.quantity) <= 0) nextErrors.quantity = "จำนวนต้องมากกว่า 0";
+
+    setFormErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setSnack({ open: true, message: "กรุณากรอกข้อมูลบังคับให้ครบก่อนบันทึก", severity: "warning" });
       return;
     }
 
@@ -261,13 +268,46 @@ export default function Page() {
             <Collapse in={!isMobile || mobileFormOpen}>
               <Stack spacing={1.2}>
                 <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
-                  <TextField select label="สินค้า" value={form.product_id} onChange={(e) => setForm((s) => ({ ...s, product_id: e.target.value }))} fullWidth>
+                  <TextField
+                    select
+                    label="สินค้า *"
+                    value={form.product_id}
+                    onChange={(e) => {
+                      setForm((s) => ({ ...s, product_id: e.target.value }));
+                      setFormErrors((prev) => ({ ...prev, product_id: undefined }));
+                    }}
+                    error={Boolean(formErrors.product_id)}
+                    helperText={formErrors.product_id}
+                    fullWidth
+                  >
                     {products.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                   </TextField>
-                  <TextField select label="คลัง" value={form.location_id} onChange={(e) => setForm((s) => ({ ...s, location_id: e.target.value }))} fullWidth>
+                  <TextField
+                    select
+                    label="คลัง *"
+                    value={form.location_id}
+                    onChange={(e) => {
+                      setForm((s) => ({ ...s, location_id: e.target.value }));
+                      setFormErrors((prev) => ({ ...prev, location_id: undefined }));
+                    }}
+                    error={Boolean(formErrors.location_id)}
+                    helperText={formErrors.location_id}
+                    fullWidth
+                  >
                     {locations.map((l) => <MenuItem key={l.id} value={l.id}>{l.name}</MenuItem>)}
                   </TextField>
-                  <TextField label="จำนวน" type="number" value={form.quantity} onChange={(e) => setForm((s) => ({ ...s, quantity: e.target.value }))} fullWidth />
+                  <TextField
+                    label="จำนวน *"
+                    type="number"
+                    value={form.quantity}
+                    onChange={(e) => {
+                      setForm((s) => ({ ...s, quantity: e.target.value }));
+                      setFormErrors((prev) => ({ ...prev, quantity: undefined }));
+                    }}
+                    error={Boolean(formErrors.quantity)}
+                    helperText={formErrors.quantity}
+                    fullWidth
+                  />
                 </Stack>
                 {form.product_id ? (
                   <Chip

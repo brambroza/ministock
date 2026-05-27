@@ -50,11 +50,13 @@ export const ProductService = {
   },
   async updateProduct(id: string, input: unknown) {
     const payload = productSchema.partial().parse(input);
+    const updatePayload = { ...payload };
+    delete updatePayload.opening_balance;
     const actor = await getCurrentActor();
     if (!actor) throw new Error("Unauthorized");
     const { data, error } = await supabaseAdmin
       .from("products")
-      .update({ ...payload, updated_by: actor.profileId })
+      .update({ ...updatePayload, updated_by: actor.profileId })
       .eq("id", id)
       .eq("company_id", actor.companyId)
       .eq("is_deleted", false)
