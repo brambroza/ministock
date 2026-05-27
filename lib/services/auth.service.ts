@@ -29,10 +29,17 @@ export const AuthService = {
       .eq("permissions.permission_code", permissionCode);
     return (data?.length ?? 0) > 0;
   },
-  async bindLineUser(lineUserId: string) {
+  async bindLineUser(input: { line_user_id: string; line_display_name?: string; line_picture_url?: string | null }) {
     const supabase = await createClient();
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) throw new Error("Unauthorized");
-    return supabase.from("user_profiles").update({ line_user_id: lineUserId }).eq("auth_user_id", user.id);
+    return supabase
+      .from("user_profiles")
+      .update({
+        line_user_id: input.line_user_id,
+        line_display_name: input.line_display_name,
+        line_picture_url: input.line_picture_url ?? null
+      })
+      .eq("auth_user_id", user.id);
   }
 };

@@ -13,7 +13,15 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID ?? "" });
         if (!liff.isLoggedIn()) liff.login();
         const profile = await liff.getProfile();
-        await fetch("/api/auth/bind-line", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ line_user_id: profile.userId }) });
+        await fetch("/api/auth/bind-line", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            line_user_id: profile.userId,
+            line_display_name: profile.displayName,
+            line_picture_url: profile.pictureUrl ?? null
+          })
+        });
         setState({ initialized: true, lineUserId: profile.userId });
       } catch {
         setState({ initialized: true });

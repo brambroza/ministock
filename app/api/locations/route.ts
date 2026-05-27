@@ -8,7 +8,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { data, error } = await LocationService.createLocation(await req.json());
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json(data, { status: 201 });
+  try {
+    const { data, error } = await LocationService.createLocation(await req.json());
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json(data, { status: 201 });
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+  }
 }

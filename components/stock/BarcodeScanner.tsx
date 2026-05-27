@@ -10,12 +10,24 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
 
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
+    let controls: { stop: () => void } | undefined;
+    let cancelled = false;
+
     if (videoRef.current) {
       reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
         if (result?.getText()) onDetected(result.getText());
+      }).then((c) => {
+        if (cancelled) c.stop();
+        else controls = c;
+      }).catch(() => {
+        // keep manual input path available
       });
     }
-    return () => reader.reset();
+
+    return () => {
+      cancelled = true;
+      if (controls?.stop) controls.stop();
+    };
   }, [onDetected]);
 
   const scanLiff = async () => {
