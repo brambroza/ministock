@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
   const jwtPayload = tokenData.id_token ? decodeJwtPayload(tokenData.id_token) : null;
   const lineEmail = typeof jwtPayload?.email === "string" ? jwtPayload.email : null;
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profileByLine } = await supabaseAdmin
     .from("user_profiles")
     .select("id, auth_user_id, email")
     .eq("line_user_id", lineProfile.userId)
@@ -81,21 +81,49 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  if (!profile?.auth_user_id) {
-    return NextResponse.redirect(`${req.nextUrl.origin}/liff/request-access`);
+  let resolvedProfile = profileByLine;
+
+  // First-time LINE login: auto-link with existing account by email (if found)
+  if (!resolvedProfile?.auth_user_id && lineEmail) {
+    const { data: profileByEmail } = await supabaseAdmin
+      .from("user_profiles")
+      .select("id, auth_user_id, email")
+      .ilike("email", lineEmail)
+      .eq("active", true)
+      .eq("is_deleted", false)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileByEmail?.auth_user_id) {
+      await supabaseAdmin
+        .from("user_profiles")
+        .update({
+          line_user_id: lineProfile.userId,
+          line_display_name: lineProfile.displayName,
+          line_picture_url: lineProfile.pictureUrl ?? null
+        })
+        .eq("id", profileByEmail.id);
+
+      resolvedProfile = profileByEmail;
+    }
+  }
+
+  if (!resolvedProfile?.auth_user_id) {
+    return NextResponse.redirect(`${req.nextUrl.origin}/liff/request-access?reason=unlinked`);
   }
 
   await supabaseAdmin
     .from("user_profiles")
     .update({
+      line_user_id: lineProfile.userId,
       line_display_name: lineProfile.displayName,
       line_picture_url: lineProfile.pictureUrl ?? null,
-      email: profile.email ?? lineEmail
+      email: resolvedProfile.email ?? lineEmail
     })
-    .eq("id", profile.id);
+    .eq("id", resolvedProfile.id);
 
-  const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(profile.auth_user_id);
-  const targetEmail = authUserResult.user?.email ?? profile.email ?? lineEmail;
+  const { data: authUserResult } = await supabaseAdmin.auth.admin.getUserById(resolvedProfile.auth_user_id);
+  const targetEmail = authUserResult.user?.email ?? resolvedProfile.email ?? lineEmail;
 
   if (!targetEmail) {
     return NextResponse.redirect(`${req.nextUrl.origin}/login?error=no_email`);
