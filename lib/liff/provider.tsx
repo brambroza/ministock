@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import liff from "liff";
+import liff from "@line/liff";
 
 type LiffCtx = { initialized: boolean; lineUserId?: string };
 const Ctx = createContext<LiffCtx>({ initialized: false });

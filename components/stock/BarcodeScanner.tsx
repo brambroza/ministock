@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Button, Stack, TextField, Typography } from "@mui/material";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import liff from "liff";
+import liff from "@line/liff";
 
 export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
