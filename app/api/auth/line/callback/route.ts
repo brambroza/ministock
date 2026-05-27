@@ -13,6 +13,12 @@ type LineProfileResponse = {
   pictureUrl?: string;
 };
 
+type ResolvedProfile = {
+  id: string;
+  auth_user_id: string;
+  email: string | null;
+};
+
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split(".")[1];
@@ -81,7 +87,7 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  let resolvedProfile = profileByLine;
+  let resolvedProfile: ResolvedProfile | null = profileByLine;
 
   // First-time LINE login: auto-link with existing account by email (if found)
   if (!resolvedProfile?.auth_user_id && lineEmail) {
@@ -108,30 +114,76 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // If still unlinked, auto-provision account and bind to default company as VIEWER
   if (!resolvedProfile?.auth_user_id) {
-    const res = NextResponse.redirect(`${req.nextUrl.origin}/login?reason=unlinked`);
-    res.cookies.set("pending_line_user_id", lineProfile.userId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 600
+    const fallbackEmail = `line_${lineProfile.userId.toLowerCase()}@line.local`;
+    const createEmail = lineEmail ?? fallbackEmail;
+
+    const { data: newAuthUser, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
+      email: createEmail,
+      email_confirm: true,
+      user_metadata: {
+        display_name: lineProfile.displayName,
+        provider: "line"
+      }
     });
-    res.cookies.set("pending_line_display_name", lineProfile.displayName, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 600
+
+    if (createAuthError || !newAuthUser.user?.id) {
+      return NextResponse.redirect(`${req.nextUrl.origin}/login?error=provision_auth`);
+    }
+
+    const { data: defaultCompany } = await supabaseAdmin
+      .from("companies")
+      .select("id")
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!defaultCompany?.id) {
+      return NextResponse.redirect(`${req.nextUrl.origin}/login?error=no_company`);
+    }
+
+    const { data: viewerRole } = await supabaseAdmin
+      .from("roles")
+      .select("id")
+      .eq("company_id", defaultCompany.id)
+      .eq("role_code", "VIEWER")
+      .limit(1)
+      .maybeSingle();
+
+    if (!viewerRole?.id) {
+      return NextResponse.redirect(`${req.nextUrl.origin}/login?error=no_viewer_role`);
+    }
+
+    const { data: newProfile, error: createProfileError } = await supabaseAdmin
+      .from("user_profiles")
+      .insert({
+        company_id: defaultCompany.id,
+        auth_user_id: newAuthUser.user.id,
+        line_user_id: lineProfile.userId,
+        line_display_name: lineProfile.displayName,
+        line_picture_url: lineProfile.pictureUrl ?? null,
+        display_name: lineProfile.displayName,
+        email: createEmail,
+        role_id: viewerRole.id,
+        active: true
+      })
+      .select("id, auth_user_id, email")
+      .single();
+
+    if (createProfileError || !newProfile) {
+      return NextResponse.redirect(`${req.nextUrl.origin}/login?error=provision_profile`);
+    }
+
+    await supabaseAdmin.from("company_users").insert({
+      company_id: defaultCompany.id,
+      user_profile_id: newProfile.id,
+      invite_status: "ACCEPTED",
+      active: true
     });
-    res.cookies.set("pending_line_picture_url", lineProfile.pictureUrl ?? "", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 600
-    });
-    return res;
+
+    resolvedProfile = newProfile;
   }
 
   await supabaseAdmin
