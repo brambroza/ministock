@@ -20,17 +20,22 @@ export const ProductService = {
   },
   async createProduct(input: unknown) {
     const payload = productSchema.parse(input);
+    const { opening_balance, ...productPayload } = payload;
     const actor = await getCurrentActor();
     if (!actor) throw new Error("Unauthorized");
-    const { data, error } = await supabaseAdmin.from("products").insert({ ...payload, company_id: actor.companyId, created_by: actor.profileId, updated_by: actor.profileId }).select("*").single();
+    const { data, error } = await supabaseAdmin
+      .from("products")
+      .insert({ ...productPayload, company_id: actor.companyId, created_by: actor.profileId, updated_by: actor.profileId })
+      .select("*")
+      .single();
     if (error) throw error;
-    if ((payload.opening_balance ?? 0) > 0) {
+    if ((opening_balance ?? 0) > 0) {
       await supabaseAdmin.from("stock_movements").insert({
         company_id: actor.companyId,
         product_id: data.id,
         location_id: payload.storage_location_id,
         movement_type: "OPENING",
-        qty_in: payload.opening_balance,
+        qty_in: opening_balance,
         unit_cost: payload.cost,
         created_by: actor.profileId,
         updated_by: actor.profileId

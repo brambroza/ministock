@@ -184,7 +184,7 @@ export default function Page() {
     setFoundProduct(data as Product);
     setTab("receive");
     setMessage({ type: "success", text: "สร้างสินค้าใหม่สำเร็จ" });
-  };
+  }; 
 
   return (
     <Stack spacing={1.5}>
