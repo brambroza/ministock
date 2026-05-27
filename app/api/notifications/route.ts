@@ -10,6 +10,22 @@ type NotificationItem = {
   href: string;
 };
 
+type MovementRow = {
+  id: string;
+  movement_type: "RECEIVE" | "ISSUE";
+  created_at: string;
+  qty_in: number | null;
+  qty_out: number | null;
+  products: Array<{ product_name: string | null }> | null;
+};
+
+type LowStockRow = {
+  product_id: string;
+  product_name: string;
+  qty_on_hand: number;
+  min_stock_qty: number;
+};
+
 export async function GET() {
   const supabase = await createClient();
 
@@ -32,10 +48,10 @@ export async function GET() {
     return NextResponse.json({ error: movementError?.message ?? lowError?.message }, { status: 400 });
   }
 
-  const movementItems: NotificationItem[] = (movements ?? []).map((m: any) => {
+  const movementItems: NotificationItem[] = ((movements ?? []) as MovementRow[]).map((m) => {
     const isReceive = m.movement_type === "RECEIVE";
     const qty = isReceive ? Number(m.qty_in ?? 0) : Number(m.qty_out ?? 0);
-    const productName = m.products?.product_name ?? "ไม่ระบุสินค้า";
+    const productName = m.products?.[0]?.product_name ?? "ไม่ระบุสินค้า";
     return {
       id: `mv-${m.id}`,
       type: isReceive ? "RECEIVE" : "ISSUE",
@@ -46,7 +62,7 @@ export async function GET() {
     };
   });
 
-  const lowStockItems: NotificationItem[] = (lowStock ?? []).map((s: any) => ({
+  const lowStockItems: NotificationItem[] = ((lowStock ?? []) as LowStockRow[]).map((s) => ({
     id: `low-${s.product_id}`,
     type: "LOW_STOCK",
     title: "สต๊อกใกล้หมด",

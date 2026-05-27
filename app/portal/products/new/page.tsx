@@ -1,17 +1,13 @@
 "use client";
 
 import { Alert, Autocomplete, Button, Card, CardContent, Collapse, Stack, TextField, Typography } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { BarcodeScanner } from "@/components/stock/BarcodeScanner";
 
 type UnitOption = { id: string; unit_code: string; unit_name: string };
 type LocationOption = { id: string; location_code: string; location_name: string };
 
 export default function Page() {
-  const searchParams = useSearchParams();
-  const initialBarcode = useMemo(() => searchParams.get("barcode") ?? "", [searchParams]);
-
   const [scannerOpen, setScannerOpen] = useState(false);
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -19,7 +15,7 @@ export default function Page() {
   const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
 
   const [form, setForm] = useState({
-    barcode: initialBarcode,
+    barcode: "",
     product_name: "",
     unit_id: "",
     price: 0,
@@ -30,6 +26,11 @@ export default function Page() {
   });
 
   useEffect(() => {
+    const barcode = new URLSearchParams(window.location.search).get("barcode") ?? "";
+    if (barcode) {
+      setForm((s) => ({ ...s, barcode }));
+    }
+
     Promise.all([
       fetch("/api/units", { cache: "no-store" }).then((r) => r.json()),
       fetch("/api/locations", { cache: "no-store" }).then((r) => r.json())

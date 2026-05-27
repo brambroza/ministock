@@ -21,6 +21,7 @@ import {
   Typography
 } from "@mui/material";
 import Link from "next/link";
+import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
@@ -204,7 +205,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
                 <Typography variant="caption" color="text.secondary">บัญชีผู้ใช้งาน</Typography>
               </Box>
               <Divider />
-              <MenuItem component={Link} href="/portal/profile" onClick={() => setProfileMenuEl(null)}>
+              <MenuItem onClick={() => { setProfileMenuEl(null); router.push("/portal/profile"); }}>
                 <ListItemIcon><PersonRoundedIcon fontSize="small" /></ListItemIcon>
                 แก้ไขโปรไฟล์
               </MenuItem>
@@ -228,9 +229,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
                 notifications.map((item) => (
                   <MenuItem
                     key={item.id}
-                    component={Link}
-                    href={item.href}
-                    onClick={() => setAnchorEl(null)}
+                    onClick={() => { setAnchorEl(null); router.push(item.href as Route); }}
                     sx={{ alignItems: "flex-start", whiteSpace: "normal" }}
                   >
                     <Box>
