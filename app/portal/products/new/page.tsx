@@ -9,6 +9,7 @@ type LocationOption = { id: string; location_code: string; location_name: string
 
 export default function Page() {
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [isLineBrowser, setIsLineBrowser] = useState(false);
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null);
@@ -26,6 +27,7 @@ export default function Page() {
   });
 
   useEffect(() => {
+    setIsLineBrowser(/Line\//i.test(navigator.userAgent));
     const barcode = new URLSearchParams(window.location.search).get("barcode") ?? "";
     if (barcode) {
       setForm((s) => ({ ...s, barcode }));
@@ -84,37 +86,81 @@ export default function Page() {
             fullWidth
           />
 
-          <Autocomplete
-            options={units}
-            value={selectedUnit}
-            onChange={(_, value) => {
-              setSelectedUnit(value);
-              setForm((s) => ({ ...s, unit_id: value?.id ?? "" }));
-            }}
-            getOptionLabel={(option) => `${option.unit_code} - ${option.unit_name}`}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            autoHighlight
-            clearOnBlur={false}
-            blurOnSelect
-            ListboxProps={{ style: { maxHeight: 280 } }}
-            renderInput={(params) => <TextField {...params} label="รหัสหน่วยนับ" placeholder="พิมพ์ค้นหา เช่น PCS / ชิ้น" />}
-          />
+          {isLineBrowser ? (
+            <>
+              <TextField
+                select
+                label="รหัสหน่วยนับ"
+                value={form.unit_id}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setForm((s) => ({ ...s, unit_id: nextId }));
+                  setSelectedUnit(units.find((u) => u.id === nextId) ?? null);
+                }}
+                SelectProps={{ native: true }}
+                fullWidth
+              >
+                <option value="">เลือกหน่วยนับ</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>{u.unit_code} - {u.unit_name}</option>
+                ))}
+              </TextField>
 
-          <Autocomplete
-            options={locations}
-            value={selectedLocation}
-            onChange={(_, value) => {
-              setSelectedLocation(value);
-              setForm((s) => ({ ...s, storage_location_id: value?.id ?? "" }));
-            }}
-            getOptionLabel={(option) => `${option.location_code} - ${option.location_name}`}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            autoHighlight
-            clearOnBlur={false}
-            blurOnSelect
-            ListboxProps={{ style: { maxHeight: 280 } }}
-            renderInput={(params) => <TextField {...params} label="รหัสคลังสินค้า" placeholder="พิมพ์ค้นหา เช่น MAIN / คลังหลัก" />}
-          />
+              <TextField
+                select
+                label="รหัสคลังสินค้า"
+                value={form.storage_location_id}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setForm((s) => ({ ...s, storage_location_id: nextId }));
+                  setSelectedLocation(locations.find((l) => l.id === nextId) ?? null);
+                }}
+                SelectProps={{ native: true }}
+                fullWidth
+              >
+                <option value="">เลือกคลังสินค้า</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>{l.location_code} - {l.location_name}</option>
+                ))}
+              </TextField>
+            </>
+          ) : (
+            <>
+              <Autocomplete
+                disablePortal
+                options={units}
+                value={selectedUnit}
+                onChange={(_, value) => {
+                  setSelectedUnit(value);
+                  setForm((s) => ({ ...s, unit_id: value?.id ?? "" }));
+                }}
+                getOptionLabel={(option) => `${option.unit_code} - ${option.unit_name}`}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                autoHighlight
+                clearOnBlur={false}
+                blurOnSelect
+                ListboxProps={{ style: { maxHeight: 280 } }}
+                renderInput={(params) => <TextField {...params} label="รหัสหน่วยนับ" placeholder="พิมพ์ค้นหา เช่น PCS / ชิ้น" />}
+              />
+
+              <Autocomplete
+                disablePortal
+                options={locations}
+                value={selectedLocation}
+                onChange={(_, value) => {
+                  setSelectedLocation(value);
+                  setForm((s) => ({ ...s, storage_location_id: value?.id ?? "" }));
+                }}
+                getOptionLabel={(option) => `${option.location_code} - ${option.location_name}`}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                autoHighlight
+                clearOnBlur={false}
+                blurOnSelect
+                ListboxProps={{ style: { maxHeight: 280 } }}
+                renderInput={(params) => <TextField {...params} label="รหัสคลังสินค้า" placeholder="พิมพ์ค้นหา เช่น MAIN / คลังหลัก" />}
+              />
+            </>
+          )}
 
           <TextField label="ราคาขาย" type="number" onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} fullWidth />
           <TextField label="ต้นทุน" type="number" onChange={(e) => setForm({ ...form, cost: Number(e.target.value) })} fullWidth />
