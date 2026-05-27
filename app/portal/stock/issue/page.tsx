@@ -7,6 +7,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Collapse,
   IconButton,
   MenuItem,
   Paper,
@@ -18,7 +19,9 @@ import {
   TablePagination,
   TableRow,
   TextField,
-  Typography
+  Typography,
+  useMediaQuery,
+  useTheme
 } from "@mui/material";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -26,6 +29,7 @@ import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import dayjs from "dayjs";
 import { AppSnackbar } from "@/components/common/AppSnackbar";
+import { BarcodeScanner } from "@/components/stock/BarcodeScanner";
 
 type IssueRow = {
   id: string;
@@ -41,7 +45,10 @@ type IssueRow = {
 };
 
 export default function Page() {
-  const [products, setProducts] = useState<Array<{ id: string; name: string }>>([]);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  const [products, setProducts] = useState<Array<{ id: string; name: string; barcode: string; storage_location_id?: string | null; cost?: number | null; unit_name?: string | null }>>([]);
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
   const [rows, setRows] = useState<IssueRow[]>([]);
 
@@ -49,6 +56,9 @@ export default function Page() {
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({ product_id: "", location_id: "", quantity: "", unit_cost: "", remark: "", reference_no: "" });
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanCode, setScanCode] = useState("");
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
   const [savingCreate, setSavingCreate] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -81,7 +91,18 @@ export default function Page() {
         return;
       }
 
-      setProducts((Array.isArray(pData) ? pData : []).map((p: { id: string; product_name: string }) => ({ id: p.id, name: p.product_name })));
+      setProducts(
+        (Array.isArray(pData) ? pData : []).map(
+          (p: { id: string; product_name: string; barcode: string; storage_location_id?: string | null; cost?: number | null; units?: { unit_name?: string }[] | null }) => ({
+            id: p.id,
+            name: p.product_name,
+            barcode: p.barcode,
+            storage_location_id: p.storage_location_id ?? null,
+            cost: p.cost ?? null,
+            unit_name: p.units?.[0]?.unit_name ?? null
+          })
+        )
+      );
       setLocations((Array.isArray(lData) ? lData : []).map((l: { id: string; location_name: string }) => ({ id: l.id, name: l.location_name })));
       setRows(Array.isArray(iData) ? iData : []);
     } catch {
@@ -94,6 +115,38 @@ export default function Page() {
   useEffect(() => {
     void load();
   }, []);
+
+  const onDetected = async (value: string) => {
+    const code = value.trim();
+    if (!code) return;
+    setScanCode(code);
+
+    let picked = products.find((p) => p.barcode === code);
+    if (!picked) {
+      const res = await fetch(`/api/products?barcode=${encodeURIComponent(code)}`, { cache: "no-store" });
+      const data = await res.json().catch(() => []);
+      if (Array.isArray(data) && data.length > 0) {
+        const p = data[0] as { id: string; product_name: string; barcode: string; storage_location_id?: string | null; cost?: number | null };
+        picked = { id: p.id, name: p.product_name, barcode: p.barcode, storage_location_id: p.storage_location_id ?? null, cost: p.cost ?? null, unit_name: null };
+      }
+    }
+
+    if (!picked) {
+      setSnack({ open: true, message: "ไม่พบสินค้าจากโค้ดนี้", severity: "warning" });
+      return;
+    }
+
+    setForm((s) => ({
+      ...s,
+      product_id: picked.id,
+      location_id: picked.storage_location_id ?? s.location_id,
+      unit_cost: String(picked.cost ?? s.unit_cost ?? ""),
+      quantity: s.quantity || "1"
+    }));
+    if (isMobile) setMobileFormOpen(true);
+    setScannerOpen(false);
+    setSnack({ open: true, message: `เลือกสินค้าแล้ว: ${picked.name}`, severity: "success" });
+  };
 
   const createIssue = async () => {
     if (!form.product_id || !form.location_id || Number(form.quantity) <= 0) {
@@ -182,23 +235,56 @@ export default function Page() {
       <Card elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3 }}>
         <CardContent>
           <Stack spacing={1.2}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
-              <TextField select label="สินค้า" value={form.product_id} onChange={(e) => setForm((s) => ({ ...s, product_id: e.target.value }))} fullWidth>
-                {products.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-              </TextField>
-              <TextField select label="คลัง" value={form.location_id} onChange={(e) => setForm((s) => ({ ...s, location_id: e.target.value }))} fullWidth>
-                {locations.map((l) => <MenuItem key={l.id} value={l.id}>{l.name}</MenuItem>)}
-              </TextField>
-              <TextField label="จำนวน" type="number" value={form.quantity} onChange={(e) => setForm((s) => ({ ...s, quantity: e.target.value }))} fullWidth />
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <TextField label="สแกนโค้ดสินค้า" value={scanCode} onChange={(e) => setScanCode(e.target.value)} fullWidth />
+              <Button variant={scannerOpen ? "outlined" : "contained"} onClick={() => setScannerOpen((s) => !s)}>
+                {scannerOpen ? "ซ่อนสแกนเนอร์" : "สแกน Barcode/QR/ถ่ายรูป"}
+              </Button>
             </Stack>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
-              <TextField label="ต้นทุน/หน่วย" type="number" value={form.unit_cost} onChange={(e) => setForm((s) => ({ ...s, unit_cost: e.target.value }))} fullWidth />
-              <TextField label="Reference No" value={form.reference_no} onChange={(e) => setForm((s) => ({ ...s, reference_no: e.target.value }))} fullWidth />
-              <TextField label="หมายเหตุ" value={form.remark} onChange={(e) => setForm((s) => ({ ...s, remark: e.target.value }))} fullWidth />
-            </Stack>
-            <Button variant="contained" onClick={createIssue} disabled={savingCreate || loading}>
-              {savingCreate ? "กำลังบันทึก..." : "บันทึกรายการเบิก"}
+
+            <Button
+              variant="text"
+              onClick={() => setMobileFormOpen((v) => !v)}
+              sx={{ display: { xs: "inline-flex", md: "none" }, alignSelf: "flex-start" }}
+            >
+              {mobileFormOpen ? "ซ่อนตัวเลือก" : "แสดงตัวเลือก"}
             </Button>
+
+            {scannerOpen ? (
+              <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                <CardContent>
+                  <BarcodeScanner onDetected={onDetected} />
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <Collapse in={!isMobile || mobileFormOpen}>
+              <Stack spacing={1.2}>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
+                  <TextField select label="สินค้า" value={form.product_id} onChange={(e) => setForm((s) => ({ ...s, product_id: e.target.value }))} fullWidth>
+                    {products.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+                  </TextField>
+                  <TextField select label="คลัง" value={form.location_id} onChange={(e) => setForm((s) => ({ ...s, location_id: e.target.value }))} fullWidth>
+                    {locations.map((l) => <MenuItem key={l.id} value={l.id}>{l.name}</MenuItem>)}
+                  </TextField>
+                  <TextField label="จำนวน" type="number" value={form.quantity} onChange={(e) => setForm((s) => ({ ...s, quantity: e.target.value }))} fullWidth />
+                </Stack>
+                {form.product_id ? (
+                  <Chip
+                    color="info"
+                    label={`หน่วย: ${products.find((p) => p.id === form.product_id)?.unit_name ?? "-"} | คลังตั้งต้น: ${locations.find((l) => l.id === (products.find((p) => p.id === form.product_id)?.storage_location_id ?? ""))?.name ?? "-"}`}
+                  />
+                ) : null}
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
+                  <TextField label="ต้นทุน/หน่วย" type="number" value={form.unit_cost} onChange={(e) => setForm((s) => ({ ...s, unit_cost: e.target.value }))} fullWidth />
+                  <TextField label="Reference No" value={form.reference_no} onChange={(e) => setForm((s) => ({ ...s, reference_no: e.target.value }))} fullWidth />
+                  <TextField label="หมายเหตุ" value={form.remark} onChange={(e) => setForm((s) => ({ ...s, remark: e.target.value }))} fullWidth />
+                </Stack>
+                <Button variant="contained" onClick={createIssue} disabled={savingCreate || loading}>
+                  {savingCreate ? "กำลังบันทึก..." : "บันทึกรายการเบิก"}
+                </Button>
+              </Stack>
+            </Collapse>
           </Stack>
         </CardContent>
       </Card>

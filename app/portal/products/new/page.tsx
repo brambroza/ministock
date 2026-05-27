@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { Alert, Autocomplete, Button, Card, CardContent, Collapse, Stack, TextField, Typography } from "@mui/material";
@@ -14,6 +15,7 @@ export default function Page() {
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const [form, setForm] = useState({
     barcode: "",
@@ -23,8 +25,23 @@ export default function Page() {
     cost: 0,
     min_stock_qty: 0,
     opening_balance: 0,
-    storage_location_id: ""
+    storage_location_id: "",
+    image_url: ""
   });
+
+  const uploadImage = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/products/upload-image", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "อัปโหลดรูปไม่สำเร็จ");
+      setForm((s) => ({ ...s, image_url: data.publicUrl ?? "" }));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     setIsLineBrowser(/Line\//i.test(navigator.userAgent));
@@ -85,6 +102,19 @@ export default function Page() {
             onChange={(e) => setForm({ ...form, product_name: e.target.value })}
             fullWidth
           />
+          <Button component="label" variant="outlined" disabled={uploading}>
+            {uploading ? "กำลังอัปโหลดรูป..." : "อัปโหลดรูปสินค้า"}
+            <input
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void uploadImage(file);
+              }}
+            />
+          </Button>
+          {form.image_url ? <img src={form.image_url} alt="product" style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 12, border: "1px solid #e5e7eb" }} /> : null}
 
           {isLineBrowser ? (
             <>

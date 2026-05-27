@@ -33,6 +33,7 @@ import MoveToInboxRoundedIcon from "@mui/icons-material/MoveToInboxRounded";
 import OutboxRoundedIcon from "@mui/icons-material/OutboxRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
+import ReceiptRoundedIcon from "@mui/icons-material/ReceiptRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
@@ -67,6 +68,7 @@ const menus = [
   { label: "รับเข้า", href: "/portal/stock/receive", icon: <MoveToInboxRoundedIcon /> },
   { label: "เบิกออก", href: "/portal/stock/issue", icon: <OutboxRoundedIcon /> },
   { label: "ปรับสต๊อก", href: "/portal/stock/adjust", icon: <TuneRoundedIcon /> },
+  { label: "สแกนบิลค่าใช้จ่าย", href: "/portal/expenses/scan", icon: <ReceiptRoundedIcon /> },
   { label: "รายงานซื้อ", href: "/portal/reports/monthly-purchase", icon: <AssessmentRoundedIcon /> },
   { label: "รายงานคงเหลือ", href: "/portal/reports/monthly-balance", icon: <AssessmentRoundedIcon /> },
   { label: "สต๊อกต่ำ", href: "/portal/reports/low-stock", icon: <WarningAmberRoundedIcon /> },
@@ -79,6 +81,7 @@ const mobileMenus = [
   { label: "สินค้า", href: "/portal/products", icon: <Inventory2RoundedIcon /> },
   { label: "คงเหลือ", href: "/portal/stock/on-hand", icon: <WarehouseRoundedIcon /> },
   { label: "รับเข้า", href: "/portal/stock/receive", icon: <MoveToInboxRoundedIcon /> },
+  { label: "ค่าใช้จ่าย", href: "/portal/expenses/scan", icon: <ReceiptRoundedIcon /> },
   { label: "รายงาน", href: "/portal/reports/monthly-balance", icon: <AssessmentRoundedIcon /> }
 ] as const;
 
@@ -146,7 +149,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
             <ListItemButton
               key={menu.href}
               component={Link}
-              href={menu.href}
+              href={menu.href as Route}
               onClick={() => setOpen(false)}
               sx={{
                 mb: 0.5,
@@ -298,7 +301,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
             <BottomNavigationAction
               key={menu.href}
               component={Link}
-              href={menu.href}
+              href={menu.href as Route}
               value={menu.href}
               label={menu.label}
               icon={menu.icon}

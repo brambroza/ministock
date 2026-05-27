@@ -10,7 +10,8 @@ export const productSchema = z.object({
   cost: z.coerce.number().min(0),
   storage_location_id: z.string().uuid().optional().nullable(),
   min_stock_qty: z.coerce.number().min(0),
-  opening_balance: z.coerce.number().min(0).optional()
+  opening_balance: z.coerce.number().min(0).optional(),
+  image_url: z.string().url().optional().nullable()
 });
 
 export const unitSchema = z.object({

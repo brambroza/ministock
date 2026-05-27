@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Chip,
+  Collapse,
+  IconButton,
+  Card,
+  CardContent,
   Paper,
   Stack,
   Table,
@@ -13,8 +17,11 @@ import {
   TablePagination,
   TableRow,
   TextField,
-  Typography
+  Typography,
+  useMediaQuery,
+  useTheme
 } from "@mui/material";
+import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
 import dayjs from "dayjs";
@@ -34,12 +41,16 @@ type StockCardRow = {
 };
 
 export default function Page() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   const [rows, setRows] = useState<StockCardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [keyword, setKeyword] = useState("");
   const [movementType, setMovementType] = useState("");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(true);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
@@ -94,27 +105,47 @@ export default function Page() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" fontWeight={700}>สต๊อกการ์ด</Typography>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Typography variant="h5" fontWeight={700}>สต๊อกการ์ด</Typography>
+        <IconButton
+          aria-label="toggle-filter"
+          onClick={() => setMobileFilterOpen((v) => !v)}
+          sx={{ display: { xs: "inline-flex", sm: "none" }, border: "1px solid #e5e7eb", borderRadius: 2 }}
+        >
+          <FilterListRoundedIcon />
+        </IconButton>
+      </Stack>
 
-      <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
-          <TextField label="ค้นหา (สินค้า/บาร์โค้ด/reference)" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(0); }} fullWidth />
-          <TextField select label="ประเภท" value={movementType} onChange={(e) => { setMovementType(e.target.value); setPage(0); }} sx={{ minWidth: 220 }}>
-            <option value="">ทั้งหมด</option>
-            <option value="OPENING">OPENING</option>
-            <option value="RECEIVE">RECEIVE</option>
-            <option value="ISSUE">ISSUE</option>
-            <option value="ADJUST_IN">ADJUST_IN</option>
-            <option value="ADJUST_OUT">ADJUST_OUT</option>
-            <option value="TRANSFER_IN">TRANSFER_IN</option>
-            <option value="TRANSFER_OUT">TRANSFER_OUT</option>
-          </TextField>
-        </Stack>
-      </Paper>
+      <Collapse in={!isMobile || mobileFilterOpen}>
+        <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
+            <TextField label="ค้นหา (สินค้า/บาร์โค้ด/reference)" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(0); }} fullWidth />
+            <TextField select label="ประเภท" value={movementType} onChange={(e) => { setMovementType(e.target.value); setPage(0); }} sx={{ minWidth: 220 }}>
+              <option value="">ทั้งหมด</option>
+              <option value="OPENING">OPENING</option>
+              <option value="RECEIVE">RECEIVE</option>
+              <option value="ISSUE">ISSUE</option>
+              <option value="ADJUST_IN">ADJUST_IN</option>
+              <option value="ADJUST_OUT">ADJUST_OUT</option>
+              <option value="TRANSFER_IN">TRANSFER_IN</option>
+              <option value="TRANSFER_OUT">TRANSFER_OUT</option>
+            </TextField>
+            <Chip
+              label="ค้นหา"
+              color="primary"
+              onClick={() => {
+                if (isMobile) setMobileFilterOpen(false);
+              }}
+              clickable
+              sx={{ alignSelf: { xs: "flex-start", md: "center" } }}
+            />
+          </Stack>
+        </Paper>
+      </Collapse>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3, overflow: "hidden" }}>
+      <Paper elevation={0} sx={{ display: { xs: "none", sm: "block" }, border: "1px solid #e5e7eb", borderRadius: 3, overflow: "hidden" }}>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -165,6 +196,33 @@ export default function Page() {
           </TableBody>
         </Table>
       </Paper>
+
+      <Stack spacing={1.2} sx={{ display: { xs: "flex", sm: "none" } }}>
+        {paged.map((r) => (
+          <Card key={r.id} elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 2.5 }}>
+            <CardContent>
+              <Stack spacing={0.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography fontWeight={700}>{r.products?.[0]?.product_name ?? "-"}</Typography>
+                  <Chip size="small" label={r.movement_type} />
+                </Stack>
+                <Typography variant="body2" color="text.secondary">{dayjs(r.movement_date).format("DD/MM/YYYY HH:mm")}</Typography>
+                <Typography variant="body2">บาร์โค้ด: {r.products?.[0]?.barcode ?? "-"}</Typography>
+                <Typography variant="body2">คลัง: {r.storage_locations?.[0]?.location_name ?? "-"}</Typography>
+                <Typography variant="body2">เข้า {Number(r.qty_in ?? 0).toLocaleString()} | ออก {Number(r.qty_out ?? 0).toLocaleString()} | คงเหลือ {Number(r.balance_qty ?? 0).toLocaleString()}</Typography>
+                <Typography variant="body2">ต้นทุน: {Number(r.unit_cost ?? 0).toLocaleString()}</Typography>
+                <Typography variant="body2">Ref: {r.reference_no ?? "-"}</Typography>
+                <Typography variant="body2">หมายเหตุ: {r.remark ?? "-"}</Typography>
+                {r.products?.[0]?.id ? (
+                  <Link href={`/portal/stock/stock-card/${r.products[0].id}` as Route} style={{ color: "#0f766e", textDecoration: "none", fontWeight: 600 }}>
+                    ดูรายละเอียด
+                  </Link>
+                ) : null}
+              </Stack>
+            </CardContent>
+          </Card>
+        ))}
+      </Stack>
 
       <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 2.5 }}>
         <TablePagination

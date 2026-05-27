@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Chip,
+  Collapse,
+  IconButton,
   Paper,
   Stack,
   Table,
@@ -13,8 +15,11 @@ import {
   TablePagination,
   TableRow,
   TextField,
-  Typography
+  Typography,
+  useMediaQuery,
+  useTheme
 } from "@mui/material";
+import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
 import { AppSnackbar } from "@/components/common/AppSnackbar";
@@ -33,6 +38,9 @@ type OnHandRow = {
 };
 
 export default function Page() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   const [rows, setRows] = useState<OnHandRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -40,6 +48,7 @@ export default function Page() {
   const [productName, setProductName] = useState("");
   const [barcode, setBarcode] = useState("");
   const [status, setStatus] = useState("");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(true);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
@@ -98,34 +107,54 @@ export default function Page() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" fontWeight={700}>สต๊อกคงเหลือ</Typography>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Typography variant="h5" fontWeight={700}>สต๊อกคงเหลือ</Typography>
+        <IconButton
+          aria-label="toggle-filter"
+          onClick={() => setMobileFilterOpen((v) => !v)}
+          sx={{ display: { xs: "inline-flex", sm: "none" }, border: "1px solid #e5e7eb", borderRadius: 2 }}
+        >
+          <FilterListRoundedIcon />
+        </IconButton>
+      </Stack>
 
-      <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-          <TextField label="ค้นหาชื่อสินค้า" value={productName} onChange={(e) => setProductName(e.target.value)} fullWidth />
-          <TextField label="บาร์โค้ด" value={barcode} onChange={(e) => setBarcode(e.target.value)} fullWidth />
-          <TextField select label="สถานะ" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ minWidth: 180 }}>
-            <option value="">ทั้งหมด</option>
-            <option value="Normal">ปกติ</option>
-            <option value="Low Stock">สต๊อกต่ำ</option>
-            <option value="Out of Stock">สินค้าหมด</option>
-          </TextField>
-          <Stack direction="row" spacing={1}>
-            <Chip label="ค้นหา" color="primary" onClick={() => void loadData()} clickable />
-            <Chip
-              label="ล้าง"
-              onClick={() => {
-                setProductName("");
-                setBarcode("");
-                setStatus("");
-                setSnack({ open: true, message: "ล้างตัวกรองแล้ว", severity: "info" });
-                setTimeout(() => void loadData(), 0);
-              }}
-              clickable
-            />
+      <Collapse in={!isMobile || mobileFilterOpen}>
+        <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
+            <TextField label="ค้นหาชื่อสินค้า" value={productName} onChange={(e) => setProductName(e.target.value)} fullWidth />
+            <TextField label="บาร์โค้ด" value={barcode} onChange={(e) => setBarcode(e.target.value)} fullWidth />
+            <TextField select label="สถานะ" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ minWidth: 180 }}>
+              <option value="">ทั้งหมด</option>
+              <option value="Normal">ปกติ</option>
+              <option value="Low Stock">สต๊อกต่ำ</option>
+              <option value="Out of Stock">สินค้าหมด</option>
+            </TextField>
+            <Stack direction="row" spacing={1}>
+              <Chip
+                label="ค้นหา"
+                color="primary"
+                onClick={() => {
+                  void loadData();
+                  if (isMobile) setMobileFilterOpen(false);
+                }}
+                clickable
+              />
+              <Chip
+                label="ล้าง"
+                onClick={() => {
+                  setProductName("");
+                  setBarcode("");
+                  setStatus("");
+                  setSnack({ open: true, message: "ล้างตัวกรองแล้ว", severity: "info" });
+                  if (isMobile) setMobileFilterOpen(true);
+                  setTimeout(() => void loadData(), 0);
+                }}
+                clickable
+              />
+            </Stack>
           </Stack>
-        </Stack>
-      </Paper>
+        </Paper>
+      </Collapse>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 

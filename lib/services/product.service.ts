@@ -8,7 +8,11 @@ export const ProductService = {
   async getProducts(query?: { name?: string; barcode?: string }) {
     const actor = await getCurrentActor();
     const supabase = actor ? supabaseAdmin : await createClient();
-    let q = supabase.from("products").select("*").eq("is_deleted", false).order("created_at", { ascending: false });
+    let q = supabase
+      .from("products")
+      .select("*, units(unit_name)")
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false });
     if (actor) q = q.eq("company_id", actor.companyId);
     if (query?.name) q = q.ilike("product_name", `%${query.name}%`);
     if (query?.barcode) q = q.ilike("barcode", `%${query.barcode}%`);
@@ -46,14 +50,29 @@ export const ProductService = {
   },
   async updateProduct(id: string, input: unknown) {
     const payload = productSchema.partial().parse(input);
-    const supabase = await createClient();
-    const { data } = await supabase.from("products").update(payload).eq("id", id).select("*").single();
+    const actor = await getCurrentActor();
+    if (!actor) throw new Error("Unauthorized");
+    const { data, error } = await supabaseAdmin
+      .from("products")
+      .update({ ...payload, updated_by: actor.profileId })
+      .eq("id", id)
+      .eq("company_id", actor.companyId)
+      .eq("is_deleted", false)
+      .select("*")
+      .single();
+    if (error) throw error;
     await AuditService.logAction({ action: "UPDATE", table_name: "products", record_id: id, new_data: data });
     return data;
   },
   async softDeleteProduct(id: string) {
-    const supabase = await createClient();
-    const { error } = await supabase.from("products").update({ is_deleted: true, active: false }).eq("id", id);
+    const actor = await getCurrentActor();
+    if (!actor) throw new Error("Unauthorized");
+    const { error } = await supabaseAdmin
+      .from("products")
+      .update({ is_deleted: true, active: false, updated_by: actor.profileId })
+      .eq("id", id)
+      .eq("company_id", actor.companyId)
+      .eq("is_deleted", false);
     if (error) throw error;
     await AuditService.logAction({ action: "DELETE", table_name: "products", record_id: id });
   }
