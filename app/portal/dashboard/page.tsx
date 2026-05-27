@@ -1,4 +1,4 @@
-import { Grid } from "@mui/material";
+import { Box } from "@mui/material";
 import { PageHeader, StatCard } from "@/components/common/Common";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,20 +16,21 @@ export default async function Page() {
   return (
     <>
       <PageHeader title="แดชบอร์ด" subtitle="ภาพรวมระบบสต๊อก" />
-      <Grid container spacing={2}>
-        <Grid item xs={6} md={3}>
-          <StatCard title="จำนวนสินค้าทั้งหมด" value={pCount ?? 0} />
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <StatCard title="มูลค่าสต๊อก" value={totalValue.toFixed(2)} />
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <StatCard title="สต๊อกต่ำ" value={low} />
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <StatCard title="สินค้าหมด" value={out} />
-        </Grid>
-      </Grid>
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2,
+          gridTemplateColumns: {
+            xs: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(4, minmax(0, 1fr))"
+          }
+        }}
+      >
+        <StatCard title="จำนวนสินค้าทั้งหมด" value={pCount ?? 0} />
+        <StatCard title="มูลค่าสต๊อก" value={totalValue.toFixed(2)} />
+        <StatCard title="สต๊อกต่ำ" value={low} />
+        <StatCard title="สินค้าหมด" value={out} />
+      </Box>
     </>
   );
 }
