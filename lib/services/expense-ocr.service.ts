@@ -120,6 +120,19 @@ type TyphoonOptions = {
   imageBuffer?: Buffer;
 };
 
+function isDebugEnabled() {
+  return process.env.TYPHOON_OCR_DEBUG === "1" || process.env.TYPHOON_OCR_DEBUG === "true";
+}
+
+function debugLog(message: string, meta?: Record<string, unknown>) {
+  if (!isDebugEnabled()) return;
+  if (meta) {
+    console.log(`[TYPHOON_OCR] ${message}`, meta);
+    return;
+  }
+  console.log(`[TYPHOON_OCR] ${message}`);
+}
+
 function extractText(payload: unknown): string {
   const p = payload as {
     text?: string;
@@ -152,18 +165,34 @@ async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, u
   let lastErr = "Typhoon OCR failed";
 
   for (const headers of headersList) {
+    debugLog("Try request", {
+      endpoint: apiUrl,
+      headerType: headers["x-api-key"] ? "x-api-key" : headers.Authorization ? "Authorization" : headers.authorization ? "authorization" : "unknown",
+      payloadKeys: Object.keys(body)
+    });
+
     const res = await fetch(apiUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(body)
     });
     const payload = await res.json().catch(() => ({}));
-    if (res.ok) return payload;
+    if (res.ok) {
+      debugLog("Request success", { endpoint: apiUrl, status: res.status, hasText: Boolean(extractText(payload).trim()) });
+      return payload;
+    }
+
+    debugLog("Request failed", {
+      endpoint: apiUrl,
+      status: res.status,
+      responseSnippet: JSON.stringify(payload).slice(0, 500)
+    });
+
     lastErr =
       (payload as { error?: string; message?: string; detail?: string }).error ??
       (payload as { error?: string; message?: string; detail?: string }).message ??
       (payload as { error?: string; message?: string; detail?: string }).detail ??
-      `Typhoon OCR failed (${res.status})`;
+      `Typhoon OCR failed (${res.status}) @ ${apiUrl}`;
   }
 
   throw new Error(lastErr);
@@ -176,15 +205,24 @@ export async function runTyphoonOCR(options: TyphoonOptions): Promise<{ rawText:
     throw new Error("TYPHOON_API_URL หรือ TYPHOON_API_KEY ยังไม่ถูกตั้งค่า");
   }
 
-  const bodies: Record<string, unknown>[] = [];
+  debugLog("Start OCR", {
+    apiUrl,
+    hasImageUrl: Boolean(options.imageUrl),
+    hasImageBuffer: Boolean(options.imageBuffer),
+    imageBufferSize: options.imageBuffer?.byteLength ?? 0
+  });
+
+  const bodies: Array<{ endpointType: "chat" | "ocr"; payload: Record<string, unknown> }> = [];
   const normalizedApiUrl = apiUrl.replace(/\/$/, "");
   const isChatCompletions = /\/chat\/completions$/.test(normalizedApiUrl);
+  const isOcrEndpoint = /\/ocr$/.test(normalizedApiUrl);
   const b64 = options.imageBuffer?.toString("base64");
   const dataUrl = b64 ? `data:image/jpeg;base64,${b64}` : undefined;
 
-  if (isChatCompletions) {
-    if (options.imageUrl) {
-      bodies.push({
+  const pushChatPayload = (imageRef: string) => {
+    bodies.push({
+      endpointType: "chat",
+      payload: {
         model: process.env.TYPHOON_OCR_MODEL || "typhoon-ocr",
         temperature: 0,
         messages: [
@@ -192,56 +230,85 @@ export async function runTyphoonOCR(options: TyphoonOptions): Promise<{ rawText:
             role: "user",
             content: [
               { type: "text", text: "อ่านข้อความจากภาพนี้และคืนเฉพาะข้อความที่อ่านได้" },
-              { type: "image_url", image_url: { url: options.imageUrl } }
+              { type: "image_url", image_url: { url: imageRef } }
             ]
           }
         ]
-      });
-    }
-    if (dataUrl) {
-      bodies.push({
-        model: "typhoon-ocr",
-        temperature: 0,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "อ่านข้อความจากภาพนี้และคืนเฉพาะข้อความที่อ่านได้" },
-              { type: "image_url", image_url: { url: dataUrl } }
-            ]
-          }
-        ]
-      });
-    }
-  } else {
-    if (options.imageUrl) {
+      }
+    });
+  };
+
+  const pushOcrPayloads = (imageRef: string, isBase64: boolean) => {
+    if (isBase64) {
       bodies.push(
-        { image_url: options.imageUrl, task: "ocr" },
-        { imageUrl: options.imageUrl, task: "ocr" },
-        { input: { image_url: options.imageUrl }, task: "ocr" }
+        { endpointType: "ocr", payload: { image_base64: imageRef, task: "ocr" } },
+        { endpointType: "ocr", payload: { image: imageRef, task: "ocr" } },
+        { endpointType: "ocr", payload: { input: { image_base64: imageRef }, task: "ocr" } }
+      );
+    } else {
+      bodies.push(
+        { endpointType: "ocr", payload: { image_url: imageRef, task: "ocr" } },
+        { endpointType: "ocr", payload: { imageUrl: imageRef, task: "ocr" } },
+        { endpointType: "ocr", payload: { input: { image_url: imageRef }, task: "ocr" } }
       );
     }
-    if (b64) {
-      bodies.push(
-        { image_base64: b64, task: "ocr" },
-        { image: b64, task: "ocr" },
-        { input: { image_base64: b64 }, task: "ocr" }
-      );
-    }
+  };
+
+  if (options.imageUrl) {
+    pushChatPayload(options.imageUrl);
+    pushOcrPayloads(options.imageUrl, false);
   }
+  if (b64) {
+    pushChatPayload(dataUrl ?? b64);
+    pushOcrPayloads(b64, true);
+  }
+
+  const endpointCandidates = Array.from(
+    new Set([
+      normalizedApiUrl,
+      isChatCompletions ? normalizedApiUrl.replace(/\/chat\/completions$/, "/ocr") : `${normalizedApiUrl.replace(/\/ocr$/, "")}/chat/completions`,
+      isOcrEndpoint ? normalizedApiUrl.replace(/\/ocr$/, "/chat/completions") : `${normalizedApiUrl.replace(/\/chat\/completions$/, "")}/ocr`
+    ])
+  );
+
+  debugLog("Endpoint candidates", { endpointCandidates, bodyCount: bodies.length });
+
+  if (bodies.length === 0) {
+    throw new Error("ไม่พบข้อมูลรูปสำหรับ OCR");
+  }
+
+  const compatibleBodies = bodies.filter((b) => {
+    if (isChatCompletions) return b.endpointType === "chat";
+    if (isOcrEndpoint) return b.endpointType === "ocr";
+    return true;
+  });
+
+  const finalBodies = compatibleBodies.length > 0 ? compatibleBodies : bodies;
 
   let payload: unknown = {};
   let lastErr = "Typhoon OCR failed";
-  for (const body of bodies) {
-    try {
-      payload = await tryTyphoon(apiUrl, apiKey, body);
-      const text = extractText(payload);
-      if (text.trim()) return { rawText: text, providerPayload: payload };
-    } catch (e) {
-      lastErr = (e as Error).message;
+  for (const endpoint of endpointCandidates) {
+    const endpointIsChat = /\/chat\/completions$/.test(endpoint);
+    debugLog("Try endpoint", { endpoint, endpointType: endpointIsChat ? "chat" : "ocr" });
+    for (const item of finalBodies) {
+      if (endpointIsChat && item.endpointType !== "chat") continue;
+      if (!endpointIsChat && item.endpointType !== "ocr") continue;
+      try {
+        payload = await tryTyphoon(endpoint, apiKey, item.payload);
+        const text = extractText(payload);
+        if (text.trim()) {
+          debugLog("OCR text extracted", { endpoint, textLength: text.length, preview: text.slice(0, 120) });
+          return { rawText: text, providerPayload: payload };
+        }
+        debugLog("OCR success but empty text", { endpoint });
+      } catch (e) {
+        lastErr = (e as Error).message;
+        debugLog("OCR attempt error", { endpoint, error: lastErr });
+      }
     }
   }
 
+  debugLog("Final OCR failed", { lastErr });
   throw new Error(lastErr || "Typhoon OCR failed");
 }
 
