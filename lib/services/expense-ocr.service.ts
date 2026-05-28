@@ -150,6 +150,7 @@ async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, u
   ];
 
   let lastErr = "Typhoon OCR failed";
+
   for (const headers of headersList) {
     const res = await fetch(apiUrl, {
       method: "POST",
@@ -164,6 +165,7 @@ async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, u
       (payload as { error?: string; message?: string; detail?: string }).detail ??
       `Typhoon OCR failed (${res.status})`;
   }
+
   throw new Error(lastErr);
 }
 
@@ -175,20 +177,57 @@ export async function runTyphoonOCR(options: TyphoonOptions): Promise<{ rawText:
   }
 
   const bodies: Record<string, unknown>[] = [];
-  if (options.imageUrl) {
-    bodies.push(
-      { image_url: options.imageUrl, task: "ocr" },
-      { imageUrl: options.imageUrl, task: "ocr" },
-      { input: { image_url: options.imageUrl }, task: "ocr" }
-    );
-  }
-  if (options.imageBuffer) {
-    const b64 = options.imageBuffer.toString("base64");
-    bodies.push(
-      { image_base64: b64, task: "ocr" },
-      { image: b64, task: "ocr" },
-      { input: { image_base64: b64 }, task: "ocr" }
-    );
+  const normalizedApiUrl = apiUrl.replace(/\/$/, "");
+  const isChatCompletions = /\/chat\/completions$/.test(normalizedApiUrl);
+  const b64 = options.imageBuffer?.toString("base64");
+  const dataUrl = b64 ? `data:image/jpeg;base64,${b64}` : undefined;
+
+  if (isChatCompletions) {
+    if (options.imageUrl) {
+      bodies.push({
+        model: process.env.TYPHOON_OCR_MODEL || "typhoon-ocr",
+        temperature: 0,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "อ่านข้อความจากภาพนี้และคืนเฉพาะข้อความที่อ่านได้" },
+              { type: "image_url", image_url: { url: options.imageUrl } }
+            ]
+          }
+        ]
+      });
+    }
+    if (dataUrl) {
+      bodies.push({
+        model: "typhoon-ocr",
+        temperature: 0,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "อ่านข้อความจากภาพนี้และคืนเฉพาะข้อความที่อ่านได้" },
+              { type: "image_url", image_url: { url: dataUrl } }
+            ]
+          }
+        ]
+      });
+    }
+  } else {
+    if (options.imageUrl) {
+      bodies.push(
+        { image_url: options.imageUrl, task: "ocr" },
+        { imageUrl: options.imageUrl, task: "ocr" },
+        { input: { image_url: options.imageUrl }, task: "ocr" }
+      );
+    }
+    if (b64) {
+      bodies.push(
+        { image_base64: b64, task: "ocr" },
+        { image: b64, task: "ocr" },
+        { input: { image_base64: b64 }, task: "ocr" }
+      );
+    }
   }
 
   let payload: unknown = {};
