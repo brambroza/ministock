@@ -184,8 +184,12 @@ function buildExpenseFlex(parsed: ReturnType<typeof parseExpenseFromText>, dupli
 }
 
 async function processExpenseImage(replyToken: string, profile: LineUserProfile, messageId: string) {
+  const traceId = randomUUID();
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] START`, { companyId: profile.company_id, profileId: profile.id, messageId });
   const imageBuffer = await fetchLineImageContent(messageId);
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] IMAGE_FETCHED`, { bytes: imageBuffer.byteLength });
   const fileHash = calcFileHash(imageBuffer);
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] HASHED`, { fileHashPrefix: fileHash.slice(0, 16) });
 
   const { data: dupByHash } = await supabaseAdmin
     .from("expense_documents")
@@ -196,6 +200,7 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
     .maybeSingle();
 
   if (dupByHash?.id) {
+    console.log(`[LINE_EXPENSE_OCR][${traceId}] DUPLICATE_BY_HASH`, { documentId: dupByHash.id });
     const parsed = (dupByHash.parse_payload ?? {}) as ReturnType<typeof parseExpenseFromText>;
     await replyRaw(replyToken, [
       {
@@ -214,10 +219,13 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
     upsert: false
   });
   if (uploadErr) throw new Error(uploadErr.message);
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] UPLOAD_OK`, { path });
 
   const imageUrl = supabaseAdmin.storage.from(bucket).getPublicUrl(path).data.publicUrl;
   const { rawText, providerPayload } = await runTyphoonOCR({ imageUrl, imageBuffer });
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] OCR_OK`, { textLength: rawText.length, preview: rawText.slice(0, 120) });
   const parsed = parseExpenseFromText(rawText);
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] PARSE_OK`, { vendor: parsed.vendor_name, invoice: parsed.invoice_no, total: parsed.total_amount, confidence: parsed.confidence_score });
 
   const { data: dupByFp } = await supabaseAdmin
     .from("expense_documents")
@@ -249,6 +257,7 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
     .single();
 
   if (docErr || !doc?.id) throw new Error(docErr?.message ?? "ไม่สามารถบันทึกเอกสารบิลได้");
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] DOCUMENT_SAVED`, { documentId: doc.id });
 
   const { data: claim, error: claimErr } = await supabaseAdmin
     .from("expense_claims")
@@ -272,6 +281,7 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
     .single();
 
   if (claimErr || !claim?.id) throw new Error(claimErr?.message ?? "ไม่สามารถบันทึกรายการค่าใช้จ่ายได้");
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] CLAIM_SAVED`, { claimId: claim.id });
 
   await supabaseAdmin.from("audit_logs").insert({
     company_id: profile.company_id,
@@ -282,6 +292,7 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
     created_by: profile.id,
     updated_by: profile.id
   });
+  console.log(`[LINE_EXPENSE_OCR][${traceId}] AUDIT_SAVED`, { recordId: claim.id });
 
   await replyRaw(replyToken, [
     {

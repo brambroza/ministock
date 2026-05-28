@@ -188,11 +188,52 @@ async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, u
       responseSnippet: JSON.stringify(payload).slice(0, 500)
     });
 
-    lastErr =
-      (payload as { error?: string; message?: string; detail?: string }).error ??
-      (payload as { error?: string; message?: string; detail?: string }).message ??
-      (payload as { error?: string; message?: string; detail?: string }).detail ??
-      `Typhoon OCR failed (${res.status}) @ ${apiUrl}`;
+    const detail = (payload as { error?: unknown; message?: unknown; detail?: unknown }).error
+      ?? (payload as { error?: unknown; message?: unknown; detail?: unknown }).message
+      ?? (payload as { error?: unknown; message?: unknown; detail?: unknown }).detail;
+    lastErr = typeof detail === "string" ? detail : `${JSON.stringify(detail)} | status=${res.status} @ ${apiUrl}`;
+  }
+
+  throw new Error(lastErr);
+}
+
+async function tryTyphoonMultipartOcr(apiUrl: string, apiKey: string, imageBuffer: Buffer) {
+  const headersList: Record<string, string>[] = [
+    { authorization: `Bearer ${apiKey}` },
+    { Authorization: `Bearer ${apiKey}` },
+    { "x-api-key": apiKey }
+  ];
+
+  let lastErr = "Typhoon OCR failed";
+  for (const headers of headersList) {
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array(imageBuffer)], { type: "image/jpeg" }), "receipt.jpg");
+    debugLog("Try multipart OCR request", {
+      endpoint: apiUrl,
+      headerType: headers["x-api-key"] ? "x-api-key" : headers.Authorization ? "Authorization" : "authorization"
+    });
+
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers,
+      body: form
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (res.ok) {
+      debugLog("Multipart OCR success", { endpoint: apiUrl, status: res.status, hasText: Boolean(extractText(payload).trim()) });
+      return payload;
+    }
+
+    debugLog("Multipart OCR failed", {
+      endpoint: apiUrl,
+      status: res.status,
+      responseSnippet: JSON.stringify(payload).slice(0, 500)
+    });
+
+    const detail = (payload as { error?: unknown; message?: unknown; detail?: unknown }).error
+      ?? (payload as { error?: unknown; message?: unknown; detail?: unknown }).message
+      ?? (payload as { error?: unknown; message?: unknown; detail?: unknown }).detail;
+    lastErr = typeof detail === "string" ? detail : `${JSON.stringify(detail)} | status=${res.status} @ ${apiUrl}`;
   }
 
   throw new Error(lastErr);
@@ -289,8 +330,25 @@ export async function runTyphoonOCR(options: TyphoonOptions): Promise<{ rawText:
   let lastErr = "Typhoon OCR failed";
   for (const endpoint of endpointCandidates) {
     const endpointIsChat = /\/chat\/completions$/.test(endpoint);
+    const endpointIsOcr = /\/ocr$/.test(endpoint);
     debugLog("Try endpoint", { endpoint, endpointType: endpointIsChat ? "chat" : "ocr" });
+
+    if (endpointIsOcr && options.imageBuffer) {
+      try {
+        payload = await tryTyphoonMultipartOcr(endpoint, apiKey, options.imageBuffer);
+        const text = extractText(payload);
+        if (text.trim()) {
+          debugLog("OCR text extracted", { endpoint, textLength: text.length, preview: text.slice(0, 120) });
+          return { rawText: text, providerPayload: payload };
+        }
+      } catch (e) {
+        lastErr = (e as Error).message;
+        debugLog("OCR attempt error", { endpoint, error: lastErr });
+      }
+    }
+
     for (const item of finalBodies) {
+      if (endpointIsOcr) continue;
       if (endpointIsChat && item.endpointType !== "chat") continue;
       if (!endpointIsChat && item.endpointType !== "ocr") continue;
       try {

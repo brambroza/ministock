@@ -6,6 +6,10 @@ import { calcFileHash, parseExpenseFromText, runTyphoonOCR } from "@/lib/service
 
 const BUCKET = "expense-bills";
 
+function logExpenseScan(traceId: string, step: string, meta?: Record<string, unknown>) {
+  console.log(`[EXPENSE_SCAN][${traceId}] ${step}`, meta ?? {});
+}
+
 async function ensureBucket() {
   const { data } = await supabaseAdmin.storage.listBuckets();
   if ((data ?? []).some((b) => b.name === BUCKET)) return;
@@ -13,18 +17,23 @@ async function ensureBucket() {
 }
 
 export async function POST(req: NextRequest) {
+  const traceId = randomUUID();
   try {
+    logExpenseScan(traceId, "REQUEST_START");
     const actor = await getCurrentActor();
     if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logExpenseScan(traceId, "ACTOR_OK", { companyId: actor.companyId, profileId: actor.profileId });
 
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) return NextResponse.json({ error: "ไม่พบไฟล์บิล" }, { status: 400 });
     if (!file.type.startsWith("image/")) return NextResponse.json({ error: "รองรับเฉพาะรูปภาพ" }, { status: 400 });
+    logExpenseScan(traceId, "FILE_RECEIVED", { name: file.name, type: file.type, size: file.size });
 
     const arr = await file.arrayBuffer();
     const buffer = Buffer.from(arr);
     const fileHash = calcFileHash(buffer);
+    logExpenseScan(traceId, "FILE_HASHED", { fileHashPrefix: fileHash.slice(0, 16), bytes: buffer.byteLength });
 
     const { data: dupByHash } = await supabaseAdmin
       .from("expense_documents")
@@ -35,6 +44,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (dupByHash?.id) {
+      logExpenseScan(traceId, "DUPLICATE_BY_HASH", { documentId: dupByHash.id });
       return NextResponse.json({ duplicate: true, duplicateType: "FILE_HASH", documentId: dupByHash.id, parsed: dupByHash.parse_payload });
     }
 
@@ -43,12 +53,24 @@ export async function POST(req: NextRequest) {
     const path = `${actor.companyId}/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.${ext}`;
 
     const { error: uploadErr } = await supabaseAdmin.storage.from(BUCKET).upload(path, buffer, { contentType: file.type, upsert: false });
-    if (uploadErr) return NextResponse.json({ error: uploadErr.message }, { status: 400 });
+    if (uploadErr) {
+      logExpenseScan(traceId, "UPLOAD_FAILED", { message: uploadErr.message, path });
+      return NextResponse.json({ error: uploadErr.message }, { status: 400 });
+    }
+    logExpenseScan(traceId, "UPLOAD_OK", { path });
 
     const publicUrl = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
     const { rawText, providerPayload } = await runTyphoonOCR({ imageUrl: publicUrl, imageBuffer: buffer });
+    logExpenseScan(traceId, "OCR_OK", { textLength: rawText.length, preview: rawText.slice(0, 120) });
     const parsed = parseExpenseFromText(rawText);
+    logExpenseScan(traceId, "PARSE_OK", {
+      vendor: parsed.vendor_name,
+      invoice: parsed.invoice_no,
+      expenseDate: parsed.expense_date,
+      totalAmount: parsed.total_amount,
+      confidence: parsed.confidence_score
+    });
 
     const { data: dupByFp } = await supabaseAdmin
       .from("expense_documents")
@@ -80,6 +102,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 400 });
+    logExpenseScan(traceId, "DOCUMENT_SAVED", { documentId: doc.id, duplicateByFingerprint: Boolean(doc.duplicate_of) });
 
     return NextResponse.json({
       duplicate: Boolean(doc.duplicate_of),
@@ -90,6 +113,7 @@ export async function POST(req: NextRequest) {
       confidenceScore: doc.confidence_score
     });
   } catch (e) {
+    logExpenseScan(traceId, "UNHANDLED_ERROR", { message: (e as Error).message, stack: (e as Error).stack });
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });
   }
 }
