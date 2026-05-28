@@ -55,7 +55,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [form, setForm] = useState({ product_id: "", location_id: "", quantity: "", unit_cost: "", remark: "", reference_no: "" });
+  const [form, setForm] = useState({ product_id: "", location_id: "", quantity: "", unit_cost: "", remark: "manual", reference_no: "issue" });
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanCode, setScanCode] = useState("");
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
@@ -317,8 +317,8 @@ export default function Page() {
                 ) : null}
                 <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
                   <TextField label="ต้นทุน/หน่วย" type="number" value={form.unit_cost} onChange={(e) => setForm((s) => ({ ...s, unit_cost: e.target.value }))} fullWidth />
-                  <TextField label="Reference No" value={form.reference_no} onChange={(e) => setForm((s) => ({ ...s, reference_no: e.target.value }))} fullWidth />
-                  <TextField label="หมายเหตุ" value={form.remark} onChange={(e) => setForm((s) => ({ ...s, remark: e.target.value }))} fullWidth />
+                  <TextField label="Reference No" value={form.reference_no} onChange={(e) => setForm((s) => ({ ...s, reference_no: e.target.value ?? 'issue' }))} fullWidth />
+                  <TextField label="หมายเหตุ" value={form.remark} onChange={(e) => setForm((s) => ({ ...s, remark: e.target.value ?? 'manual' }))} fullWidth />
                 </Stack>
                 <Button variant="contained" onClick={createIssue} disabled={savingCreate || loading}>
                   {savingCreate ? "กำลังบันทึก..." : "บันทึกรายการเบิก"}
