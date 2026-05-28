@@ -9,7 +9,7 @@ export async function GET() {
     const supabase = actor ? supabaseAdmin : await createClient();
     let q = supabase
       .from("stock_movements")
-      .select("id,movement_date,movement_type,qty_in,qty_out,balance_qty,unit_cost,reference_no,remark,products(id,product_name,barcode),storage_locations(id,location_name)")
+      .select("id,movement_date,movement_type,qty_in,qty_out,balance_qty,unit_cost,reference_no,remark,products(id,product_name,barcode,image_url),storage_locations(id,location_name)")
       .eq("is_deleted", false)
       .order("movement_date", { ascending: false })
       .limit(1000);

@@ -21,6 +21,7 @@ import {
   useMediaQuery,
   useTheme
 } from "@mui/material";
+import Image from "next/image";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
@@ -36,7 +37,7 @@ type StockCardRow = {
   unit_cost: number;
   reference_no: string | null;
   remark: string | null;
-  products: { id: string; product_name: string; barcode: string }[] | null;
+  products: { id: string; product_name: string; barcode: string; image_url?: string | null }[] | null;
   storage_locations: { id: string; location_name: string }[] | null;
 };
 
@@ -150,6 +151,7 @@ export default function Page() {
           <TableHead>
             <TableRow>
               <TableCell>วันที่</TableCell>
+              <TableCell>รูป</TableCell>
               <TableCell>สินค้า</TableCell>
               <TableCell>บาร์โค้ด</TableCell>
               <TableCell>คลัง</TableCell>
@@ -167,6 +169,16 @@ export default function Page() {
             {paged.map((r) => (
               <TableRow key={r.id} hover>
                 <TableCell>{dayjs(r.movement_date).format("DD/MM/YYYY HH:mm")}</TableCell>
+                <TableCell>
+                  <Image
+                    src={r.products?.[0]?.image_url ?? "https://placehold.co/48x48?text=-"}
+                    alt={r.products?.[0]?.product_name ?? "product"}
+                    width={48}
+                    height={48}
+                    unoptimized
+                    style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                  />
+                </TableCell>
                 <TableCell>{r.products?.[0]?.product_name ?? "-"}</TableCell>
                 <TableCell>{r.products?.[0]?.barcode ?? "-"}</TableCell>
                 <TableCell>{r.storage_locations?.[0]?.location_name ?? "-"}</TableCell>
@@ -188,7 +200,7 @@ export default function Page() {
             ))}
             {!loading && paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12}>
+                <TableCell colSpan={13}>
                   <Typography color="text.secondary">ไม่พบข้อมูลสต๊อกการ์ด</Typography>
                 </TableCell>
               </TableRow>
@@ -203,7 +215,17 @@ export default function Page() {
             <CardContent>
               <Stack spacing={0.5}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography fontWeight={700}>{r.products?.[0]?.product_name ?? "-"}</Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Image
+                      src={r.products?.[0]?.image_url ?? "https://placehold.co/48x48?text=-"}
+                      alt={r.products?.[0]?.product_name ?? "product"}
+                      width={44}
+                      height={44}
+                      unoptimized
+                      style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                    />
+                    <Typography fontWeight={700}>{r.products?.[0]?.product_name ?? "-"}</Typography>
+                  </Stack>
                   <Chip size="small" label={r.movement_type} />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">{dayjs(r.movement_date).format("DD/MM/YYYY HH:mm")}</Typography>

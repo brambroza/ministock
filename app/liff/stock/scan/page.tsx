@@ -44,6 +44,7 @@ export default function Page() {
   const [isLineBrowser, setIsLineBrowser] = useState(false);
   const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [tab, setTab] = useState<"receive" | "create">("receive");
+  const [autoContinue, setAutoContinue] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
@@ -68,6 +69,23 @@ export default function Page() {
     opening_balance: 0,
     image_url: ""
   });
+
+  const prepareNextScan = useCallback(() => {
+    setBarcode("");
+    setFoundProduct(null);
+    setModeDialogOpen(false);
+    setReceiveErrors({});
+    setCreateErrors({});
+    setScannerOpen(true);
+    setTab("receive");
+    setReceive((s) => ({ ...s, qty: 1, reference_no: "", remark: "" }));
+    setCreateForm((s) => ({
+      ...s,
+      product_name: "",
+      opening_balance: 0,
+      image_url: ""
+    }));
+  }, []);
 
   const uploadImage = async (file: File) => {
     setUploading(true);
@@ -168,6 +186,10 @@ export default function Page() {
 
     setMessage({ type: "success", text: "บันทึกรับสินค้าเข้าสต๊อกเรียบร้อย" });
     setReceive({ qty: 1, unit_cost: receive.unit_cost, reference_no: "", remark: "" });
+    if (autoContinue) {
+      prepareNextScan();
+      setMessage({ type: "success", text: "บันทึกเรียบร้อย พร้อมสแกนชิ้นถัดไป" });
+    }
   };
 
   const submitCreate = async () => {
@@ -217,7 +239,7 @@ export default function Page() {
 
     setFoundProduct(data as Product);
     setTab("receive");
-    setMessage({ type: "success", text: "สร้างสินค้าใหม่สำเร็จ" });
+    setMessage({ type: "success", text: "สร้างสินค้าใหม่สำเร็จ กรุณากรอกจำนวนแล้วบันทึกรับเข้า" });
   }; 
 
   return (
@@ -275,6 +297,16 @@ export default function Page() {
             <Button variant="outlined" onClick={() => setModeDialogOpen(true)} sx={{ borderRadius: 2.5 }}>
               เลือกโหมดการทำงาน
             </Button>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Chip
+                clickable
+                color={autoContinue ? "success" : "default"}
+                variant={autoContinue ? "filled" : "outlined"}
+                label={autoContinue ? "โหมดต่อเนื่อง: เปิด" : "โหมดต่อเนื่อง: ปิด"}
+                onClick={() => setAutoContinue((v) => !v)}
+              />
+              <Button size="small" variant="text" onClick={prepareNextScan}>สแกนชิ้นถัดไป</Button>
+            </Stack>
             <TextField label="บาร์โค้ด / QR Code" value={barcode} onChange={(e) => setBarcode(e.target.value)} fullWidth />
             {scannerOpen ? <BarcodeScanner onDetected={detectBarcode} /> : null}
           </Stack>
@@ -364,7 +396,12 @@ export default function Page() {
               <TextField label="หมายเหตุ" value={receive.remark} onChange={(e) => setReceive((s) => ({ ...s, remark: e.target.value }))} fullWidth multiline minRows={2} />
 
               <Box>
-                <Button disabled={loading || !foundProduct} variant="contained" size="large" onClick={submitReceive}>บันทึกรับเข้า</Button>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Button disabled={loading || !foundProduct} variant="contained" size="large" onClick={submitReceive}>
+                    {autoContinue ? "บันทึกและสแกนต่อ" : "บันทึกรับเข้า"}
+                  </Button>
+                  <Button disabled={loading} variant="outlined" size="large" onClick={prepareNextScan}>ล้างและสแกนใหม่</Button>
+                </Stack>
               </Box>
             </Stack>
           ) : (

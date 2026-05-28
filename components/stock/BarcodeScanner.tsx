@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, Stack, TextField, Typography } from "@mui/material";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
@@ -17,6 +17,27 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
   const [liffReady, setLiffReady] = useState(false);
   const [scannerEnabled, setScannerEnabled] = useState(true);
   const [busyImageDecode, setBusyImageDecode] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const playBeep = useCallback(() => {
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
+      const ctx = audioCtxRef.current;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 980;
+      gain.gain.value = 0.06;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    } catch {
+      // noop
+    }
+  }, []);
 
   useEffect(() => {
     onDetectedRef.current = onDetected;
@@ -78,6 +99,7 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
             if (last && last.value === text && now - last.at < 1500) return;
 
             lastDetectedRef.current = { value: text, at: now };
+            playBeep();
             onDetectedRef.current(text);
           }
         );
@@ -95,7 +117,7 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
       unmounted = true;
       if (controls?.stop) controls.stop();
     };
-  }, [scannerEnabled]);
+  }, [playBeep, scannerEnabled]);
 
   const scanLiff = async () => {
     try {
@@ -104,7 +126,10 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
         return;
       }
       const result = await liff.scanCodeV2();
-      if (result.value) onDetected(result.value.trim());
+      if (result.value) {
+        playBeep();
+        onDetected(result.value.trim());
+      }
       else setCameraError("ไม่พบข้อมูลจาก LIFF scanCodeV2");
     } catch {
       setCameraError("การสแกนผ่าน LIFF ไม่สำเร็จ ให้ใช้ถ่ายรูป/เลือกรูปแทน");
@@ -143,6 +168,7 @@ export function BarcodeScanner({ onDetected }: { onDetected: (value: string) => 
         setCameraError("ไม่พบ Barcode/QR ในรูป กรุณาถ่ายให้ชัดขึ้นและเต็มกรอบ");
         return;
       }
+      playBeep();
       onDetected(text);
       setCameraError("");
     } catch {

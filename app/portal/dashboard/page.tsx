@@ -12,6 +12,7 @@ import {
   TableRow,
   Typography
 } from "@mui/material";
+import Image from "next/image";
 import dayjs from "dayjs";
 import { PageHeader, StatCard } from "@/components/common/Common";
 import { createClient } from "@/lib/supabase/server";
@@ -37,6 +38,12 @@ export default async function Page() {
   const currentExpense = Number((Array.isArray(expCurrent) && expCurrent[0]?.total_expense) || 0);
   const prevExpense = Number((Array.isArray(expPrev) && expPrev[0]?.total_expense) || 0);
   const maxBar = Math.max(currentExpense, prevExpense, 1);
+  const productIds = Array.from(new Set((onhand ?? []).map((i) => i.product_id).filter(Boolean)));
+  const { data: productImages } = productIds.length
+    ? await supabase.from("products").select("id,image_url").in("id", productIds)
+    : { data: [] as { id: string; image_url: string | null }[] };
+  const imageMap = new Map((productImages ?? []).map((p) => [p.id, p.image_url]));
+
   const available = (onhand ?? [])
     .filter((i) => Number(i.qty_on_hand ?? 0) > 0)
     .sort((a, b) => String(a.product_name ?? "").localeCompare(String(b.product_name ?? "")));
@@ -88,6 +95,7 @@ export default async function Page() {
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell>รูป</TableCell>
                 <TableCell>สินค้า</TableCell>
                 <TableCell>บาร์โค้ด</TableCell>
                 <TableCell>คลัง</TableCell>
@@ -99,6 +107,16 @@ export default async function Page() {
             <TableBody>
               {available.map((r) => (
                 <TableRow key={`${r.product_id}-${r.location_name}`} hover>
+                  <TableCell>
+                    <Image
+                      src={imageMap.get(r.product_id) ?? "https://placehold.co/48x48?text=-"}
+                      alt={r.product_name}
+                      width={48}
+                      height={48}
+                      unoptimized
+                      style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                    />
+                  </TableCell>
                   <TableCell>{r.product_name}</TableCell>
                   <TableCell>{r.barcode ?? "-"}</TableCell>
                   <TableCell>{r.location_name ?? "-"}</TableCell>
@@ -117,7 +135,17 @@ export default async function Page() {
           {available.map((r) => (
             <Card key={`${r.product_id}-${r.location_name}`} elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 2.5 }}>
               <CardContent>
-                <Typography fontWeight={700}>{r.product_name}</Typography>
+                <Stack direction="row" spacing={1.2} alignItems="center" mb={0.5}>
+                  <Image
+                    src={imageMap.get(r.product_id) ?? "https://placehold.co/52x52?text=-"}
+                    alt={r.product_name}
+                    width={52}
+                    height={52}
+                    unoptimized
+                    style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                  />
+                  <Typography fontWeight={700}>{r.product_name}</Typography>
+                </Stack>
                 <Typography variant="body2" color="text.secondary">บาร์โค้ด: {r.barcode ?? "-"}</Typography>
                 <Typography variant="body2" color="text.secondary">คลัง: {r.location_name ?? "-"}</Typography>
                 <Box mt={1} display="flex" justifyContent="space-between" alignItems="center">

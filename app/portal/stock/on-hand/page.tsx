@@ -19,6 +19,7 @@ import {
   useMediaQuery,
   useTheme
 } from "@mui/material";
+import Image from "next/image";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
@@ -35,6 +36,7 @@ type OnHandRow = {
   price: number;
   stock_value: number;
   status: "Normal" | "Low Stock" | "Out of Stock";
+  image_url?: string | null;
 };
 
 export default function Page() {
@@ -162,6 +164,7 @@ export default function Page() {
         <Table size="small">
           <TableHead>
             <TableRow>
+              <TableCell>รูป</TableCell>
               <TableCell>สินค้า</TableCell>
               <TableCell>บาร์โค้ด</TableCell>
               <TableCell>คลัง</TableCell>
@@ -176,6 +179,16 @@ export default function Page() {
           <TableBody>
             {pagedRows.map((r) => (
               <TableRow key={`${r.product_id}-${r.location_name}`} hover>
+                <TableCell>
+                  <Image
+                    src={r.image_url ?? "https://placehold.co/48x48?text=-"}
+                    alt={r.product_name}
+                    width={48}
+                    height={48}
+                    unoptimized
+                    style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                  />
+                </TableCell>
                 <TableCell>{r.product_name}</TableCell>
                 <TableCell>{r.barcode}</TableCell>
                 <TableCell>{r.location_name ?? "-"}</TableCell>
@@ -199,7 +212,7 @@ export default function Page() {
             ))}
             {!loading && pagedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9}>
+                <TableCell colSpan={10}>
                   <Typography color="text.secondary">ไม่พบข้อมูลสต๊อกคงเหลือ</Typography>
                 </TableCell>
               </TableRow>
