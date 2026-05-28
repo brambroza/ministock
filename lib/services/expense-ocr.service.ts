@@ -135,7 +135,7 @@ function debugLog(message: string, meta?: Record<string, unknown>) {
 
 async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = 20000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(`timeout:${timeoutMs}ms`), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } finally {
@@ -223,17 +223,22 @@ async function tryTyphoonMultipartOcr(apiUrl: string, apiKey: string, imageBuffe
   for (const headers of headersList) {
     const form = new FormData();
     form.append("file", new Blob([new Uint8Array(imageBuffer)], { type: "image/jpeg" }), "receipt.jpg");
+    form.append("task", "ocr");
+    form.append("language_hint", "th,en");
     debugLog("Try multipart OCR request", {
       endpoint: apiUrl,
       headerType: headers["x-api-key"] ? "x-api-key" : headers.Authorization ? "Authorization" : "authorization"
     });
 
     try {
+      const timeoutMs = Number(process.env.TYPHOON_OCR_TIMEOUT_MS || 12000);
+      debugLog("Multipart OCR request start", { endpoint: apiUrl, timeoutMs });
       const res = await fetchWithTimeout(apiUrl, {
         method: "POST",
         headers,
         body: form
-      }, Number(process.env.TYPHOON_OCR_TIMEOUT_MS || 20000));
+      }, timeoutMs);
+      debugLog("Multipart OCR response received", { endpoint: apiUrl, status: res.status });
       const payload = await res.json().catch(() => ({}));
       if (res.ok) {
         debugLog("Multipart OCR success", { endpoint: apiUrl, status: res.status, hasText: Boolean(extractText(payload).trim()) });
