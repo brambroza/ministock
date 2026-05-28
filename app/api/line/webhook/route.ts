@@ -62,6 +62,23 @@ async function replyRaw(replyToken: string, messages: LineMessage[]) {
   });
 }
 
+async function pushRaw(to: string, messages: LineMessage[]) {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) return;
+
+  await fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      to,
+      messages
+    })
+  });
+}
+
 async function replyMessage(replyToken: string, text: string, withQuickReply = true) {
   await replyRaw(replyToken, [
     {
@@ -183,7 +200,7 @@ function buildExpenseFlex(parsed: ReturnType<typeof parseExpenseFromText>, dupli
   };
 }
 
-async function processExpenseImage(replyToken: string, profile: LineUserProfile, messageId: string) {
+async function processExpenseImage(userId: string, profile: LineUserProfile, messageId: string) {
   const traceId = randomUUID();
   console.log(`[LINE_EXPENSE_OCR][${traceId}] START`, { companyId: profile.company_id, profileId: profile.id, messageId });
   const imageBuffer = await fetchLineImageContent(messageId);
@@ -202,7 +219,7 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
   if (dupByHash?.id) {
     console.log(`[LINE_EXPENSE_OCR][${traceId}] DUPLICATE_BY_HASH`, { documentId: dupByHash.id });
     const parsed = (dupByHash.parse_payload ?? {}) as ReturnType<typeof parseExpenseFromText>;
-    await replyRaw(replyToken, [
+    await pushRaw(userId, [
       {
         type: "flex",
         altText: "พบไฟล์บิลซ้ำ",
@@ -294,7 +311,7 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
   });
   console.log(`[LINE_EXPENSE_OCR][${traceId}] AUDIT_SAVED`, { recordId: claim.id });
 
-  await replyRaw(replyToken, [
+  await pushRaw(userId, [
     {
       type: "flex",
       altText: "สรุปบิลค่าใช้จ่าย",
@@ -425,9 +442,12 @@ export async function POST(req: NextRequest) {
 
     if (event.message?.type === "image" && event.message.id) {
       try {
-        await processExpenseImage(event.replyToken, profile, event.message.id);
+        await replyMessage(event.replyToken, "ได้รับรูปบิลแล้ว กำลังอ่าน OCR และบันทึกข้อมูล กรุณารอสักครู่...", false);
+        await processExpenseImage(event.source.userId, profile, event.message.id);
       } catch (e) {
-        await replyMessage(event.replyToken, `อ่านบิลไม่สำเร็จ: ${(e as Error).message}`, false);
+        await pushRaw(event.source.userId, [
+          { type: "text", text: `อ่านบิลไม่สำเร็จ: ${(e as Error).message}` }
+        ]);
       }
       continue;
     }
