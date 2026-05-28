@@ -58,7 +58,7 @@ export default function Page() {
   const [receiveErrors, setReceiveErrors] = useState<{ qty?: string; location_id?: string }>({});
   const [createErrors, setCreateErrors] = useState<{ product_name?: string; unit_id?: string; storage_location_id?: string }>({});
 
-  const [receive, setReceive] = useState({ qty: 1, unit_cost: 0, reference_no: "", remark: "" });
+  const [receive, setReceive] = useState({ qty: 1, unit_cost: 0, reference_no: "scan-in", remark: "manual" });
   const [createForm, setCreateForm] = useState({
     product_name: "",
     unit_id: "",

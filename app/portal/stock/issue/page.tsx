@@ -183,7 +183,7 @@ export default function Page() {
       }
 
       setSnack({ open: true, message: "บันทึกรายการเบิกเรียบร้อย", severity: "success" });
-      setForm({ product_id: "", location_id: "", quantity: "", unit_cost: "", remark: "", reference_no: "" });
+      setForm({ product_id: "", location_id: "", quantity: "", unit_cost: "", remark: "manual", reference_no: "issue-01" });
       await load();
     } finally {
       setSavingCreate(false);
