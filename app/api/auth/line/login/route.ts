@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const channelId = process.env.LINE_AUTH_CHANNEL_ID ?? process.env.LINE_CHANNEL_ID;
   if (!channelId) {
     return NextResponse.json({ error: "LINE_AUTH_CHANNEL_ID is missing" }, { status: 500 });
@@ -15,6 +15,7 @@ export async function GET() {
   const state = randomUUID();
   const nonce = randomUUID();
   const redirectUri = `${appUrl}/api/auth/line/callback`;
+  const next = req.nextUrl.searchParams.get("next") || "/portal/dashboard";
 
   const url = new URL("https://access.line.me/oauth2/v2.1/authorize");
   url.searchParams.set("response_type", "code");
@@ -33,6 +34,13 @@ export async function GET() {
     maxAge: 600
   });
   res.cookies.set("line_oauth_nonce", nonce, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600
+  });
+  res.cookies.set("line_oauth_next", next, {
     httpOnly: true,
     secure: true,
     sameSite: "lax",

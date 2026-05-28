@@ -5,14 +5,16 @@ import { useEffect, useState } from "react";
 
 export default function LoginPage() {
   const [reason, setReason] = useState<string | null>(null);
+  const [nextUrl, setNextUrl] = useState("/portal/dashboard");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const r = new URLSearchParams(window.location.search).get("reason");
-    setReason(r);
+    const params = new URLSearchParams(window.location.search);
+    setReason(params.get("reason"));
+    setNextUrl(params.get("next") || "/portal/dashboard");
   }, []);
 
   const loginWithEmail = async () => {
@@ -35,7 +37,7 @@ export default function LoginPage() {
         await fetch("/api/auth/line/link-pending", { method: "POST" });
       }
 
-      location.href = "/portal/dashboard";
+      location.href = nextUrl;
     } finally {
       setLoading(false);
     }
@@ -57,7 +59,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Auto login after successful registration
       const loginRes = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -68,14 +69,14 @@ export default function LoginPage() {
         setError(data?.error ?? "เข้าสู่ระบบไม่สำเร็จ");
         return;
       }
-      location.href = "/portal/dashboard";
+      location.href = nextUrl;
     } finally {
       setLoading(false);
     }
   };
 
   const loginWithLine = async () => {
-    window.location.href = "/api/auth/line/login";
+    window.location.href = `/api/auth/line/login?next=${encodeURIComponent(nextUrl)}`;
   };
 
   return (

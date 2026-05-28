@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
   const stateCookie = req.cookies.get("line_oauth_state")?.value;
+  const nextAfterLogin = req.cookies.get("line_oauth_next")?.value || "/portal/dashboard";
 
   if (!code || !state || !stateCookie || state !== stateCookie) {
     return NextResponse.redirect(`${req.nextUrl.origin}/login?error=invalid_state`);
@@ -207,7 +208,7 @@ export async function GET(req: NextRequest) {
     type: "magiclink",
     email: targetEmail,
     options: {
-      redirectTo: `${appUrl}/auth/complete`
+      redirectTo: `${appUrl}/auth/complete?next=${encodeURIComponent(nextAfterLogin)}`
     }
   });
 
@@ -221,5 +222,6 @@ export async function GET(req: NextRequest) {
   const response = NextResponse.redirect(linkData.properties.action_link);
   response.cookies.set("line_oauth_state", "", { path: "/", maxAge: 0 });
   response.cookies.set("line_oauth_nonce", "", { path: "/", maxAge: 0 });
+  response.cookies.set("line_oauth_next", "", { path: "/", maxAge: 0 });
   return response;
 }

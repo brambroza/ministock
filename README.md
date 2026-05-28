@@ -20,6 +20,7 @@ Production-ready multi-tenant stock management for LINE OA + LIFF with Next.js, 
 ## Core Routes
 - Portal: `/portal/dashboard`, `/portal/products`, `/portal/stock/on-hand`, `/portal/stock/receive`, `/portal/reports/monthly-purchase`
 - LIFF: `/liff`, `/liff/dashboard`, `/liff/stock/scan`, `/liff/stock/receive`, `/liff/stock/issue`, `/liff/stock/on-hand`
+- Share Invite: `/portal/users/share`, `/join/[token]`
 
 ## Supabase Notes
 - All business tables include `id, company_id, created_at, updated_at, created_by, updated_by, is_deleted`.
@@ -33,6 +34,11 @@ Production-ready multi-tenant stock management for LINE OA + LIFF with Next.js, 
 - Set `NEXT_PUBLIC_LIFF_ID`
 - Use `liff.scanCodeV2()` for QR/2D
 - Barcode fallback uses `@zxing/browser`
+
+## Team Share Links
+- สร้างลิงก์เชิญเพื่อนเข้าบริษัทเดียวกันที่ `/portal/users/share`
+- รองรับลิงก์ LINE Login + Join เพื่อเข้าทีมอัตโนมัติ
+- รองรับลิงก์ เพิ่มเพื่อน OA / เปิดแชท OA / LIFF dashboard
 
 ## Deploy to Vercel
 1. Push repo to GitHub.

@@ -35,6 +35,7 @@ import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import ReceiptRoundedIcon from "@mui/icons-material/ReceiptRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
+import ShareRoundedIcon from "@mui/icons-material/ShareRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
@@ -73,6 +74,7 @@ const menus = [
   { label: "รายงานคงเหลือ", href: "/portal/reports/monthly-balance", icon: <AssessmentRoundedIcon /> },
   { label: "สต๊อกต่ำ", href: "/portal/reports/low-stock", icon: <WarningAmberRoundedIcon /> },
   { label: "ผู้ใช้", href: "/portal/users", icon: <GroupRoundedIcon /> },
+  { label: "แชร์ลิงก์ทีม", href: "/portal/users/share", icon: <ShareRoundedIcon /> },
   { label: "โปรไฟล์", href: "/portal/profile", icon: <PersonRoundedIcon /> }
 ] as const;
 

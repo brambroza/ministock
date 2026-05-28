@@ -33,13 +33,16 @@ export async function updateSession(request: NextRequest) {
   if (protectedRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
   if (pathname === "/login" && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/portal/dashboard";
-    return NextResponse.redirect(url);
+    const next = request.nextUrl.searchParams.get("next");
+    if (next && next.startsWith("/")) {
+      return NextResponse.redirect(new URL(next, request.url));
+    }
+    return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
 
   return response;
