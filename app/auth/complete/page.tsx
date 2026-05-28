@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Box, CircularProgress, Stack, Typography } from "@mui/material";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AuthCompletePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [message, setMessage] = useState("กำลังยืนยันตัวตน...");
 
   useEffect(() => {
@@ -39,13 +38,13 @@ export default function AuthCompletePage() {
         return;
       }
 
-      const next = searchParams.get("next") || "/portal/dashboard";
+      const next = new URLSearchParams(window.location.search).get("next") || "/portal/dashboard";
       window.location.href = next;
       router.refresh();
     };
 
     run();
-  }, [router, searchParams]);
+  }, [router]);
 
   return (
     <Box minHeight="100vh" display="grid" sx={{ placeItems: "center", bgcolor: "#f3f6fb" }}>
