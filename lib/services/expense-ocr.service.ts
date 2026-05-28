@@ -115,32 +115,95 @@ function parseByRegex(rawText: string): ParsedExpense {
   };
 }
 
-export async function runTyphoonOCR(imageUrl: string): Promise<{ rawText: string; providerPayload: unknown }> {
+type TyphoonOptions = {
+  imageUrl?: string;
+  imageBuffer?: Buffer;
+};
+
+function extractText(payload: unknown): string {
+  const p = payload as {
+    text?: string;
+    result?: { text?: string; content?: string };
+    data?: { text?: string; content?: string; output_text?: string };
+    output_text?: string;
+    content?: string;
+  };
+
+  return (
+    p.text ??
+    p.result?.text ??
+    p.result?.content ??
+    p.data?.text ??
+    p.data?.content ??
+    p.data?.output_text ??
+    p.output_text ??
+    p.content ??
+    ""
+  );
+}
+
+async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, unknown>) {
+  const headersList: Record<string, string>[] = [
+    { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+    { "content-type": "application/json", "x-api-key": apiKey },
+    { "content-type": "application/json", Authorization: `Bearer ${apiKey}` }
+  ];
+
+  let lastErr = "Typhoon OCR failed";
+  for (const headers of headersList) {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body)
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (res.ok) return payload;
+    lastErr =
+      (payload as { error?: string; message?: string; detail?: string }).error ??
+      (payload as { error?: string; message?: string; detail?: string }).message ??
+      (payload as { error?: string; message?: string; detail?: string }).detail ??
+      `Typhoon OCR failed (${res.status})`;
+  }
+  throw new Error(lastErr);
+}
+
+export async function runTyphoonOCR(options: TyphoonOptions): Promise<{ rawText: string; providerPayload: unknown }> {
   const apiUrl = process.env.TYPHOON_API_URL;
   const apiKey = process.env.TYPHOON_API_KEY;
   if (!apiUrl || !apiKey) {
     throw new Error("TYPHOON_API_URL หรือ TYPHOON_API_KEY ยังไม่ถูกตั้งค่า");
   }
 
-  const res = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({ image_url: imageUrl, task: "ocr" })
-  });
+  const bodies: Record<string, unknown>[] = [];
+  if (options.imageUrl) {
+    bodies.push(
+      { image_url: options.imageUrl, task: "ocr" },
+      { imageUrl: options.imageUrl, task: "ocr" },
+      { input: { image_url: options.imageUrl }, task: "ocr" }
+    );
+  }
+  if (options.imageBuffer) {
+    const b64 = options.imageBuffer.toString("base64");
+    bodies.push(
+      { image_base64: b64, task: "ocr" },
+      { image: b64, task: "ocr" },
+      { input: { image_base64: b64 }, task: "ocr" }
+    );
+  }
 
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Typhoon OCR failed");
+  let payload: unknown = {};
+  let lastErr = "Typhoon OCR failed";
+  for (const body of bodies) {
+    try {
+      payload = await tryTyphoon(apiUrl, apiKey, body);
+      const text = extractText(payload);
+      if (text.trim()) return { rawText: text, providerPayload: payload };
+    } catch (e) {
+      lastErr = (e as Error).message;
+    }
+  }
 
-  const text =
-    (payload as { text?: string }).text ??
-    (payload as { result?: { text?: string } }).result?.text ??
-    (payload as { data?: { text?: string } }).data?.text ??
-    JSON.stringify(payload);
-
-  return { rawText: text, providerPayload: payload };
+  throw new Error(lastErr || "Typhoon OCR failed");
 }
 
 export function parseExpenseFromText(rawText: string): ParsedExpense {

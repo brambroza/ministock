@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const publicUrl = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
-    const { rawText, providerPayload } = await runTyphoonOCR(publicUrl);
+    const { rawText, providerPayload } = await runTyphoonOCR({ imageUrl: publicUrl, imageBuffer: buffer });
     const parsed = parseExpenseFromText(rawText);
 
     const { data: dupByFp } = await supabaseAdmin

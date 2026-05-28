@@ -216,7 +216,7 @@ async function processExpenseImage(replyToken: string, profile: LineUserProfile,
   if (uploadErr) throw new Error(uploadErr.message);
 
   const imageUrl = supabaseAdmin.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-  const { rawText, providerPayload } = await runTyphoonOCR(imageUrl);
+  const { rawText, providerPayload } = await runTyphoonOCR({ imageUrl, imageBuffer });
   const parsed = parseExpenseFromText(rawText);
 
   const { data: dupByFp } = await supabaseAdmin
