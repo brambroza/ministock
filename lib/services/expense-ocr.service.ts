@@ -165,6 +165,38 @@ function extractText(payload: unknown): string {
   );
 }
 
+function extractTextDeep(payload: unknown): string {
+  const direct = extractText(payload).trim();
+  if (direct) return direct;
+
+  const results: string[] = [];
+  const seen = new Set<unknown>();
+  const textKeys = new Set(["text", "content", "output_text", "ocr_text", "raw_text"]);
+
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    if (seen.has(node)) return;
+    seen.add(node);
+
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+
+    const rec = node as Record<string, unknown>;
+    for (const [k, v] of Object.entries(rec)) {
+      if (typeof v === "string" && textKeys.has(k) && v.trim()) {
+        results.push(v.trim());
+      } else {
+        walk(v);
+      }
+    }
+  };
+
+  walk(payload);
+  return results.join("\n").trim();
+}
+
 async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, unknown>) {
   const headersList: Record<string, string>[] = [
     { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
@@ -189,7 +221,7 @@ async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, u
       }, Number(process.env.TYPHOON_OCR_TIMEOUT_MS || 20000));
       const payload = await res.json().catch(() => ({}));
       if (res.ok) {
-        debugLog("Request success", { endpoint: apiUrl, status: res.status, hasText: Boolean(extractText(payload).trim()) });
+        debugLog("Request success", { endpoint: apiUrl, status: res.status, hasText: Boolean(extractTextDeep(payload)) });
         return payload;
       }
 
@@ -212,63 +244,11 @@ async function tryTyphoon(apiUrl: string, apiKey: string, body: Record<string, u
   throw new Error(lastErr);
 }
 
-async function tryTyphoonMultipartOcr(apiUrl: string, apiKey: string, imageBuffer: Buffer) {
-  const headersList: Record<string, string>[] = [
-    { authorization: `Bearer ${apiKey}` },
-    { Authorization: `Bearer ${apiKey}` },
-    { "x-api-key": apiKey }
-  ];
-
-  let lastErr = "Typhoon OCR failed";
-  for (const headers of headersList) {
-    const form = new FormData();
-    form.append("file", new Blob([new Uint8Array(imageBuffer)], { type: "image/jpeg" }), "receipt.jpg");
-    form.append("task", "ocr");
-    form.append("language_hint", "th,en");
-    debugLog("Try multipart OCR request", {
-      endpoint: apiUrl,
-      headerType: headers["x-api-key"] ? "x-api-key" : headers.Authorization ? "Authorization" : "authorization"
-    });
-
-    try {
-      const timeoutMs = Number(process.env.TYPHOON_OCR_TIMEOUT_MS || 12000);
-      debugLog("Multipart OCR request start", { endpoint: apiUrl, timeoutMs });
-      const res = await fetchWithTimeout(apiUrl, {
-        method: "POST",
-        headers,
-        body: form
-      }, timeoutMs);
-      debugLog("Multipart OCR response received", { endpoint: apiUrl, status: res.status });
-      const payload = await res.json().catch(() => ({}));
-      if (res.ok) {
-        debugLog("Multipart OCR success", { endpoint: apiUrl, status: res.status, hasText: Boolean(extractText(payload).trim()) });
-        return payload;
-      }
-
-      debugLog("Multipart OCR failed", {
-        endpoint: apiUrl,
-        status: res.status,
-        responseSnippet: JSON.stringify(payload).slice(0, 500)
-      });
-
-      const detail = (payload as { error?: unknown; message?: unknown; detail?: unknown }).error
-        ?? (payload as { error?: unknown; message?: unknown; detail?: unknown }).message
-        ?? (payload as { error?: unknown; message?: unknown; detail?: unknown }).detail;
-      lastErr = typeof detail === "string" ? detail : `${JSON.stringify(detail)} | status=${res.status} @ ${apiUrl}`;
-    } catch (e) {
-      lastErr = `${(e as Error).name}: ${(e as Error).message} @ ${apiUrl}`;
-      debugLog("Multipart OCR exception", { endpoint: apiUrl, error: lastErr });
-    }
-  }
-
-  throw new Error(lastErr);
-}
-
 export async function runTyphoonOCR(options: TyphoonOptions): Promise<{ rawText: string; providerPayload: unknown }> {
-  const apiUrl = process.env.TYPHOON_API_URL;
-  const apiKey = process.env.TYPHOON_API_KEY;
+  const apiUrl = process.env.TYPHOON_OCR_API_URL || process.env.TYPHOON_API_URL;
+  const apiKey = process.env.TYPHOON_OCR_API_KEY || process.env.TYPHOON_API_KEY;
   if (!apiUrl || !apiKey) {
-    throw new Error("TYPHOON_API_URL หรือ TYPHOON_API_KEY ยังไม่ถูกตั้งค่า");
+    throw new Error("TYPHOON_OCR_API_URL หรือ TYPHOON_OCR_API_KEY ยังไม่ถูกตั้งค่า");
   }
 
   debugLog("Start OCR", {
@@ -278,116 +258,49 @@ export async function runTyphoonOCR(options: TyphoonOptions): Promise<{ rawText:
     imageBufferSize: options.imageBuffer?.byteLength ?? 0
   });
 
-  const bodies: Array<{ endpointType: "chat" | "ocr"; payload: Record<string, unknown> }> = [];
   const normalizedApiUrl = apiUrl.replace(/\/$/, "");
-  const isChatCompletions = /\/chat\/completions$/.test(normalizedApiUrl);
-  const isOcrEndpoint = /\/ocr$/.test(normalizedApiUrl);
+  const endpoint = normalizedApiUrl.endsWith("/chat/completions")
+    ? normalizedApiUrl
+    : `${normalizedApiUrl.replace(/\/ocr$/, "").replace(/\/$/, "")}/chat/completions`;
   const b64 = options.imageBuffer?.toString("base64");
   const dataUrl = b64 ? `data:image/jpeg;base64,${b64}` : undefined;
 
-  const pushChatPayload = (imageRef: string) => {
-    bodies.push({
-      endpointType: "chat",
-      payload: {
-        model: process.env.TYPHOON_OCR_MODEL || "typhoon-ocr",
-        temperature: 0,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "อ่านข้อความจากภาพนี้และคืนเฉพาะข้อความที่อ่านได้" },
-              { type: "image_url", image_url: { url: imageRef } }
-            ]
-          }
+  const buildPayload = (imageRef: string) => ({
+    model: process.env.TYPHOON_OCR_MODEL || "typhoon-ocr",
+    temperature: 0,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "อ่านข้อความจากภาพนี้และคืนเฉพาะข้อความที่อ่านได้" },
+          { type: "image_url", image_url: { url: imageRef } }
         ]
       }
-    });
-  };
-
-  const pushOcrPayloads = (imageRef: string, isBase64: boolean) => {
-    if (isBase64) {
-      bodies.push(
-        { endpointType: "ocr", payload: { image_base64: imageRef, task: "ocr" } },
-        { endpointType: "ocr", payload: { image: imageRef, task: "ocr" } },
-        { endpointType: "ocr", payload: { input: { image_base64: imageRef }, task: "ocr" } }
-      );
-    } else {
-      bodies.push(
-        { endpointType: "ocr", payload: { image_url: imageRef, task: "ocr" } },
-        { endpointType: "ocr", payload: { imageUrl: imageRef, task: "ocr" } },
-        { endpointType: "ocr", payload: { input: { image_url: imageRef }, task: "ocr" } }
-      );
-    }
-  };
-
-  if (options.imageUrl) {
-    pushChatPayload(options.imageUrl);
-    pushOcrPayloads(options.imageUrl, false);
-  }
-  if (b64) {
-    pushChatPayload(dataUrl ?? b64);
-    pushOcrPayloads(b64, true);
-  }
-
-  const endpointCandidates = Array.from(
-    new Set([
-      normalizedApiUrl,
-      isChatCompletions ? normalizedApiUrl.replace(/\/chat\/completions$/, "/ocr") : `${normalizedApiUrl.replace(/\/ocr$/, "")}/chat/completions`,
-      isOcrEndpoint ? normalizedApiUrl.replace(/\/ocr$/, "/chat/completions") : `${normalizedApiUrl.replace(/\/chat\/completions$/, "")}/ocr`
-    ])
-  );
-
-  debugLog("Endpoint candidates", { endpointCandidates, bodyCount: bodies.length });
+    ]
+  });
+  const bodies: Record<string, unknown>[] = [];
+  if (options.imageUrl) bodies.push(buildPayload(options.imageUrl));
+  if (dataUrl) bodies.push(buildPayload(dataUrl));
+  debugLog("Endpoint selected", { endpoint, bodyCount: bodies.length });
 
   if (bodies.length === 0) {
     throw new Error("ไม่พบข้อมูลรูปสำหรับ OCR");
   }
 
-  const compatibleBodies = bodies.filter((b) => {
-    if (isChatCompletions) return b.endpointType === "chat";
-    if (isOcrEndpoint) return b.endpointType === "ocr";
-    return true;
-  });
-
-  const finalBodies = compatibleBodies.length > 0 ? compatibleBodies : bodies;
-
   let payload: unknown = {};
   let lastErr = "Typhoon OCR failed";
-  for (const endpoint of endpointCandidates) {
-    const endpointIsChat = /\/chat\/completions$/.test(endpoint);
-    const endpointIsOcr = /\/ocr$/.test(endpoint);
-    debugLog("Try endpoint", { endpoint, endpointType: endpointIsChat ? "chat" : "ocr" });
-
-    if (endpointIsOcr && options.imageBuffer) {
-      try {
-        payload = await tryTyphoonMultipartOcr(endpoint, apiKey, options.imageBuffer);
-        const text = extractText(payload);
-        if (text.trim()) {
-          debugLog("OCR text extracted", { endpoint, textLength: text.length, preview: text.slice(0, 120) });
-          return { rawText: text, providerPayload: payload };
-        }
-      } catch (e) {
-        lastErr = (e as Error).message;
-        debugLog("OCR attempt error", { endpoint, error: lastErr });
+  for (const body of bodies) {
+    try {
+      payload = await tryTyphoon(endpoint, apiKey, body);
+      const text = extractTextDeep(payload);
+      if (text.trim()) {
+        debugLog("OCR text extracted", { endpoint, textLength: text.length, preview: text.slice(0, 120) });
+        return { rawText: text, providerPayload: payload };
       }
-    }
-
-    for (const item of finalBodies) {
-      if (endpointIsOcr) continue;
-      if (endpointIsChat && item.endpointType !== "chat") continue;
-      if (!endpointIsChat && item.endpointType !== "ocr") continue;
-      try {
-        payload = await tryTyphoon(endpoint, apiKey, item.payload);
-        const text = extractText(payload);
-        if (text.trim()) {
-          debugLog("OCR text extracted", { endpoint, textLength: text.length, preview: text.slice(0, 120) });
-          return { rawText: text, providerPayload: payload };
-        }
-        debugLog("OCR success but empty text", { endpoint });
-      } catch (e) {
-        lastErr = (e as Error).message;
-        debugLog("OCR attempt error", { endpoint, error: lastErr });
-      }
+      debugLog("OCR success but empty text", { endpoint, payloadPreview: JSON.stringify(payload).slice(0, 500) });
+    } catch (e) {
+      lastErr = (e as Error).message;
+      debugLog("OCR attempt error", { endpoint, error: lastErr });
     }
   }
 
