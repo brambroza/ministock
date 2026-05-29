@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { Box, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import liff from "@line/liff";
 
 type LiffCtx = { initialized: boolean; lineUserId?: string };
@@ -8,6 +8,7 @@ const Ctx = createContext<LiffCtx>({ initialized: false });
 
 export function LiffProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<LiffCtx>({ initialized: false });
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const run = async () => {
@@ -37,16 +38,29 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
             window.location.href = "/liff/request-access";
             return;
           }
+          setError(data?.error ?? "ยืนยันสิทธิ์ LIFF ไม่สำเร็จ");
+          return;
         }
 
         setState({ initialized: true, lineUserId: profile.userId });
       } catch {
-        setState({ initialized: true });
+        setError("เชื่อมต่อ LIFF ไม่สำเร็จ");
       }
     };
 
     void run();
   }, []);
+
+  if (error) {
+    return (
+      <Box minHeight="70vh" display="grid" sx={{ placeItems: "center" }}>
+        <Stack spacing={1} alignItems="center">
+          <Typography color="error.main">{error}</Typography>
+          <Button variant="contained" onClick={() => window.location.reload()}>ลองใหม่</Button>
+        </Stack>
+      </Box>
+    );
+  }
 
   if (!state.initialized) {
     return (

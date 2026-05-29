@@ -109,19 +109,17 @@ export default function Page() {
   useEffect(() => {
     if (!initialized) return;
     setIsLineBrowser(/Line\//i.test(navigator.userAgent));
-    Promise.all([
-      fetch("/api/units", { cache: "no-store" }).then((r) => r.json()),
-      fetch("/api/locations", { cache: "no-store" }).then((r) => r.json())
-    ])
-      .then(([u, l]) => {
-      if (!Array.isArray(u)) {
-        setBootError((u as { error?: string })?.error ?? "โหลดหน่วยนับไม่สำเร็จ");
+    fetch("/api/liff/bootstrap", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((payload) => {
+      if (!Array.isArray(payload?.units)) {
+        setBootError(payload?.error ?? "โหลดหน่วยนับไม่สำเร็จ");
       }
-      if (!Array.isArray(l)) {
-        setBootError((l as { error?: string })?.error ?? "โหลดคลังสินค้าไม่สำเร็จ");
+      if (!Array.isArray(payload?.locations)) {
+        setBootError(payload?.error ?? "โหลดคลังสินค้าไม่สำเร็จ");
       }
-      const unitRows = Array.isArray(u) ? (u as UnitOption[]) : [];
-      const locationRows = Array.isArray(l) ? (l as LocationOption[]) : [];
+      const unitRows = Array.isArray(payload?.units) ? (payload.units as UnitOption[]) : [];
+      const locationRows = Array.isArray(payload?.locations) ? (payload.locations as LocationOption[]) : [];
       setUnits(unitRows);
       setLocations(locationRows);
       if (locationRows.length > 0) {
