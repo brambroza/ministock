@@ -41,6 +41,7 @@ type LocationOption = { id: string; location_code: string; location_name: string
 export default function Page() {
   const [barcode, setBarcode] = useState("");
   const [scannerOpen, setScannerOpen] = useState(true);
+  const [isLineBrowser, setIsLineBrowser] = useState(false);
   const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [tab, setTab] = useState<"receive" | "create">("receive");
   const [autoContinue, setAutoContinue] = useState(true);
@@ -102,6 +103,7 @@ export default function Page() {
   };
 
   useEffect(() => {
+    setIsLineBrowser(/Line\//i.test(navigator.userAgent));
     Promise.all([
       fetch("/api/units", { cache: "no-store" }).then((r) => r.json()),
       fetch("/api/locations", { cache: "no-store" }).then((r) => r.json())
@@ -392,9 +394,14 @@ export default function Page() {
                 error={Boolean(receiveErrors.location_id)}
                 helperText={receiveErrors.location_id}
                 fullWidth
+                SelectProps={isLineBrowser ? { native: true } : undefined}
               >
-                <MenuItem value="">เลือกคลังสินค้า</MenuItem>
-                {locations.map((o) => (
+                {isLineBrowser ? <option value="">เลือกคลังสินค้า</option> : <MenuItem value="">เลือกคลังสินค้า</MenuItem>}
+                {locations.map((o) => isLineBrowser ? (
+                  <option key={o.id} value={o.id}>
+                    {o.location_code} - {o.location_name}
+                  </option>
+                ) : (
                   <MenuItem key={o.id} value={o.id}>
                     {o.location_code} - {o.location_name}
                   </MenuItem>
@@ -470,9 +477,14 @@ export default function Page() {
                 error={Boolean(createErrors.unit_id)}
                 helperText={createErrors.unit_id}
                 fullWidth
+                SelectProps={isLineBrowser ? { native: true } : undefined}
               >
-                <MenuItem value="">เลือกหน่วยนับ</MenuItem>
-                {units.map((o) => (
+                {isLineBrowser ? <option value="">เลือกหน่วยนับ</option> : <MenuItem value="">เลือกหน่วยนับ</MenuItem>}
+                {units.map((o) => isLineBrowser ? (
+                  <option key={o.id} value={o.id}>
+                    {o.unit_code} - {o.unit_name}
+                  </option>
+                ) : (
                   <MenuItem key={o.id} value={o.id}>
                     {o.unit_code} - {o.unit_name}
                   </MenuItem>
@@ -491,9 +503,14 @@ export default function Page() {
                 error={Boolean(createErrors.storage_location_id)}
                 helperText={createErrors.storage_location_id}
                 fullWidth
+                SelectProps={isLineBrowser ? { native: true } : undefined}
               >
-                <MenuItem value="">เลือกคลังเริ่มต้น</MenuItem>
-                {locations.map((o) => (
+                {isLineBrowser ? <option value="">เลือกคลังเริ่มต้น</option> : <MenuItem value="">เลือกคลังเริ่มต้น</MenuItem>}
+                {locations.map((o) => isLineBrowser ? (
+                  <option key={o.id} value={o.id}>
+                    {o.location_code} - {o.location_name}
+                  </option>
+                ) : (
                   <MenuItem key={o.id} value={o.id}>
                     {o.location_code} - {o.location_name}
                   </MenuItem>
