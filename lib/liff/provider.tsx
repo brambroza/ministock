@@ -13,8 +13,16 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const run = async () => {
       try {
-        await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID ?? "" });
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID ?? "";
+        if (!liffId) {
+          setError("ไม่ได้ตั้งค่า LIFF ID");
+          setState({ initialized: true });
+          return;
+        }
+
+        await liff.init({ liffId });
         if (!liff.isLoggedIn()) {
+          // ถ้าไม่ล็อกอิน ให้ยิง login และปล่อย initialized ไว้ false รอ redirect กลับ
           liff.login();
           return;
         }
@@ -38,29 +46,22 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
             window.location.href = "/liff/request-access";
             return;
           }
+          // session bind พลาด ให้ใช้งานต่อได้ แต่แจ้งเตือน
           setError(data?.error ?? "ยืนยันสิทธิ์ LIFF ไม่สำเร็จ");
+          setState({ initialized: true, lineUserId: profile.userId });
           return;
         }
 
         setState({ initialized: true, lineUserId: profile.userId });
       } catch {
-        setError("เชื่อมต่อ LIFF ไม่สำเร็จ");
+        // fallback: ไม่บล็อกหน้า ให้ใช้งานต่อได้ (เผื่อมี session ฝั่งเว็บอยู่แล้ว)
+        setError("เชื่อมต่อ LIFF ไม่สำเร็จ (กำลังใช้โหมดสำรอง)");
+        setState({ initialized: true });
       }
     };
 
     void run();
   }, []);
-
-  if (error) {
-    return (
-      <Box minHeight="70vh" display="grid" sx={{ placeItems: "center" }}>
-        <Stack spacing={1} alignItems="center">
-          <Typography color="error.main">{error}</Typography>
-          <Button variant="contained" onClick={() => window.location.reload()}>ลองใหม่</Button>
-        </Stack>
-      </Box>
-    );
-  }
 
   if (!state.initialized) {
     return (
@@ -70,6 +71,20 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
           <Typography variant="body2" color="text.secondary">กำลังเชื่อมต่อ LINE...</Typography>
         </Stack>
       </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Ctx.Provider value={state}>
+        <Box sx={{ px: 2, pt: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="caption" color="warning.main">{error}</Typography>
+            <Button size="small" onClick={() => window.location.reload()}>ลองใหม่</Button>
+          </Stack>
+        </Box>
+        {children}
+      </Ctx.Provider>
     );
   }
 
