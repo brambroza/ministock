@@ -12,7 +12,6 @@ import {
   TableRow,
   Typography
 } from "@mui/material";
-import Image from "next/image";
 import dayjs from "dayjs";
 import { PageHeader, StatCard } from "@/components/common/Common";
 import { createClient } from "@/lib/supabase/server";
@@ -108,13 +107,10 @@ export default async function Page() {
               {available.map((r) => (
                 <TableRow key={`${r.product_id}-${r.location_name}`} hover>
                   <TableCell>
-                    <Image
+                    <img
                       src={imageMap.get(r.product_id) ?? "https://placehold.co/48x48?text=-"}
                       alt={r.product_name}
-                      width={48}
-                      height={48}
-                      unoptimized
-                      style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                      style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                     />
                   </TableCell>
                   <TableCell>{r.product_name}</TableCell>
@@ -136,13 +132,10 @@ export default async function Page() {
             <Card key={`${r.product_id}-${r.location_name}`} elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 2.5 }}>
               <CardContent>
                 <Stack direction="row" spacing={1.2} alignItems="center" mb={0.5}>
-                  <Image
+                  <img
                     src={imageMap.get(r.product_id) ?? "https://placehold.co/52x52?text=-"}
                     alt={r.product_name}
-                    width={52}
-                    height={52}
-                    unoptimized
-                    style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                    style={{ width: 52, height: 52, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                   />
                   <Typography fontWeight={700}>{r.product_name}</Typography>
                 </Stack>

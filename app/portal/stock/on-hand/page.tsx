@@ -19,7 +19,6 @@ import {
   useMediaQuery,
   useTheme
 } from "@mui/material";
-import Image from "next/image";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
@@ -180,13 +179,10 @@ export default function Page() {
             {pagedRows.map((r) => (
               <TableRow key={`${r.product_id}-${r.location_name}`} hover>
                 <TableCell>
-                  <Image
+                  <img
                     src={r.image_url ?? "https://placehold.co/48x48?text=-"}
                     alt={r.product_name}
-                    width={48}
-                    height={48}
-                    unoptimized
-                    style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                    style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                   />
                 </TableCell>
                 <TableCell>{r.product_name}</TableCell>

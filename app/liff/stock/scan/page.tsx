@@ -313,6 +313,41 @@ export default function Page() {
         </CardContent>
       </Card>
 
+      <Card elevation={0} sx={{ border: "1px dashed #cbd5e1", borderRadius: 3, bgcolor: "#f8fafc" }}>
+        <CardContent>
+          <Stack spacing={1}>
+            <Typography fontWeight={700}>เพิ่มสินค้าแบบ Manual</Typography>
+            <Typography variant="body2" color="text.secondary">
+              ใช้กรณีไม่มีบาร์โค้ด/กล้องไม่สะดวก สามารถกรอกรหัสสินค้าและข้อมูลสินค้าได้ทันที
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setTab("create");
+                  setModeDialogOpen(false);
+                  setFoundProduct(null);
+                  setScannerOpen(false);
+                  setMessage({ type: "info", text: "เข้าสู่โหมดเพิ่มสินค้าแบบ Manual แล้ว" });
+                }}
+              >
+                เพิ่มสินค้า Manual
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setTab("create");
+                  setModeDialogOpen(false);
+                  setScannerOpen(false);
+                }}
+              >
+                เพิ่มต่อเนื่องแบบ Manual
+              </Button>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+
       {message ? <Alert severity={message.type}>{message.text}</Alert> : null}
 
       {foundProduct ? (

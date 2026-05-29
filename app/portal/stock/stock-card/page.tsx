@@ -21,7 +21,6 @@ import {
   useMediaQuery,
   useTheme
 } from "@mui/material";
-import Image from "next/image";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
@@ -170,13 +169,10 @@ export default function Page() {
               <TableRow key={r.id} hover>
                 <TableCell>{dayjs(r.movement_date).format("DD/MM/YYYY HH:mm")}</TableCell>
                 <TableCell>
-                  <Image
+                  <img
                     src={r.products?.[0]?.image_url ?? "https://placehold.co/48x48?text=-"}
                     alt={r.products?.[0]?.product_name ?? "product"}
-                    width={48}
-                    height={48}
-                    unoptimized
-                    style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                    style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                   />
                 </TableCell>
                 <TableCell>{r.products?.[0]?.product_name ?? "-"}</TableCell>
@@ -216,13 +212,10 @@ export default function Page() {
               <Stack spacing={0.5}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Image
+                    <img
                       src={r.products?.[0]?.image_url ?? "https://placehold.co/48x48?text=-"}
                       alt={r.products?.[0]?.product_name ?? "product"}
-                      width={44}
-                      height={44}
-                      unoptimized
-                      style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                      style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                     />
                     <Typography fontWeight={700}>{r.products?.[0]?.product_name ?? "-"}</Typography>
                   </Stack>
