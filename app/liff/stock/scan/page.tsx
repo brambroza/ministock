@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Card,
@@ -14,6 +13,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  MenuItem,
   Stack,
   TextField,
   Typography
@@ -41,7 +41,6 @@ type LocationOption = { id: string; location_code: string; location_name: string
 export default function Page() {
   const [barcode, setBarcode] = useState("");
   const [scannerOpen, setScannerOpen] = useState(true);
-  const [isLineBrowser, setIsLineBrowser] = useState(false);
   const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [tab, setTab] = useState<"receive" | "create">("receive");
   const [autoContinue, setAutoContinue] = useState(true);
@@ -50,8 +49,7 @@ export default function Page() {
 
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
-  const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
+  const [receiveLocationId, setReceiveLocationId] = useState("");
 
   const [foundProduct, setFoundProduct] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -104,7 +102,6 @@ export default function Page() {
   };
 
   useEffect(() => {
-    setIsLineBrowser(/Line\//i.test(navigator.userAgent));
     Promise.all([
       fetch("/api/units", { cache: "no-store" }).then((r) => r.json()),
       fetch("/api/locations", { cache: "no-store" }).then((r) => r.json())
@@ -113,11 +110,19 @@ export default function Page() {
       const locationRows = Array.isArray(l) ? (l as LocationOption[]) : [];
       setUnits(unitRows);
       setLocations(locationRows);
-      if (locationRows.length > 0 && !selectedLocation) setSelectedLocation(locationRows[0]);
+      if (locationRows.length > 0) {
+        setReceiveLocationId((prev) => prev || locationRows[0].id);
+      }
+      if (unitRows.length > 0) {
+        setCreateForm((s) => ({ ...s, unit_id: s.unit_id || unitRows[0].id }));
+      }
+      if (locationRows.length > 0) {
+        setCreateForm((s) => ({ ...s, storage_location_id: s.storage_location_id || locationRows[0].id }));
+      }
     });
-  }, [selectedLocation]);
+  }, []);
 
-  const locationId = useMemo(() => selectedLocation?.id ?? "", [selectedLocation]);
+  const locationId = useMemo(() => receiveLocationId ?? "", [receiveLocationId]);
 
   const detectBarcode = useCallback(async (value: string) => {
     const code = value.trim();
@@ -136,8 +141,7 @@ export default function Page() {
       setTab("receive");
 
       if (p.storage_location_id) {
-        const loc = locations.find((x) => x.id === p.storage_location_id);
-        if (loc) setSelectedLocation(loc);
+        setReceiveLocationId(p.storage_location_id);
       }
 
       setReceive((s) => ({ ...s, unit_cost: p.cost ?? 0 }));
@@ -148,7 +152,7 @@ export default function Page() {
       setCreateForm((s) => ({ ...s, product_name: "" }));
       setModeDialogOpen(true);
     }
-  }, [locations]);
+  }, []);
 
   const submitReceive = async () => {
     if (!foundProduct) return;
@@ -377,39 +381,25 @@ export default function Page() {
               <Alert severity="info">ใช้สำหรับเพิ่มจำนวนสต๊อกจาก Barcode/QR ที่สแกนได้</Alert>
               <TextField label="สินค้า" value={foundProduct?.product_name ?? "ยังไม่พบสินค้า"} fullWidth disabled />
 
-              {isLineBrowser ? (
-                <TextField
-                  select
-                  label="คลังสินค้า *"
-                  value={selectedLocation?.id ?? ""}
-                  onChange={(e) => {
-                    setSelectedLocation(locations.find((x) => x.id === e.target.value) ?? null);
-                    setReceiveErrors((prev) => ({ ...prev, location_id: undefined }));
-                  }}
-                  SelectProps={{ native: true }}
-                  error={Boolean(receiveErrors.location_id)}
-                  helperText={receiveErrors.location_id}
-                  fullWidth
-                >
-                  <option value="">เลือกคลังสินค้า</option>
-                  {locations.map((o) => <option key={o.id} value={o.id}>{o.location_code} - {o.location_name}</option>)}
-                </TextField>
-              ) : (
-                <Autocomplete
-                  disablePortal
-                  options={locations}
-                  value={selectedLocation}
-                  onChange={(_, value) => {
-                    setSelectedLocation(value);
-                    setReceiveErrors((prev) => ({ ...prev, location_id: undefined }));
-                  }}
-                  getOptionLabel={(o) => `${o.location_code} - ${o.location_name}`}
-                  isOptionEqualToValue={(a, b) => a.id === b.id}
-                  renderInput={(params) => (
-                    <TextField {...params} label="คลังสินค้า *" error={Boolean(receiveErrors.location_id)} helperText={receiveErrors.location_id} />
-                  )}
-                />
-              )}
+              <TextField
+                select
+                label="คลังสินค้า *"
+                value={receiveLocationId}
+                onChange={(e) => {
+                  setReceiveLocationId(e.target.value);
+                  setReceiveErrors((prev) => ({ ...prev, location_id: undefined }));
+                }}
+                error={Boolean(receiveErrors.location_id)}
+                helperText={receiveErrors.location_id}
+                fullWidth
+              >
+                <MenuItem value="">เลือกคลังสินค้า</MenuItem>
+                {locations.map((o) => (
+                  <MenuItem key={o.id} value={o.id}>
+                    {o.location_code} - {o.location_name}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <Stack direction="row" spacing={1}>
                 <TextField
@@ -468,84 +458,47 @@ export default function Page() {
                 fullWidth
               />
 
-              {isLineBrowser ? (
-                <TextField
-                  select
-                  label="หน่วยนับ *"
-                  value={createForm.unit_id}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setCreateForm((s) => ({ ...s, unit_id: nextId }));
-                    setSelectedUnit(units.find((x) => x.id === nextId) ?? null);
-                    setCreateErrors((prev) => ({ ...prev, unit_id: undefined }));
-                  }}
-                  SelectProps={{ native: true }}
-                  error={Boolean(createErrors.unit_id)}
-                  helperText={createErrors.unit_id}
-                  fullWidth
-                >
-                  <option value="">เลือกหน่วยนับ</option>
-                  {units.map((o) => <option key={o.id} value={o.id}>{o.unit_code} - {o.unit_name}</option>)}
-                </TextField>
-              ) : (
-                <Autocomplete
-                  disablePortal
-                  options={units}
-                  value={selectedUnit}
-                  onChange={(_, value) => {
-                    setSelectedUnit(value);
-                    setCreateForm((s) => ({ ...s, unit_id: value?.id ?? "" }));
-                    setCreateErrors((prev) => ({ ...prev, unit_id: undefined }));
-                  }}
-                  getOptionLabel={(o) => `${o.unit_code} - ${o.unit_name}`}
-                  isOptionEqualToValue={(a, b) => a.id === b.id}
-                  renderInput={(params) => (
-                    <TextField {...params} label="หน่วยนับ *" error={Boolean(createErrors.unit_id)} helperText={createErrors.unit_id} />
-                  )}
-                />
-              )}
+              <TextField
+                select
+                label="หน่วยนับ *"
+                value={createForm.unit_id}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setCreateForm((s) => ({ ...s, unit_id: nextId }));
+                  setCreateErrors((prev) => ({ ...prev, unit_id: undefined }));
+                }}
+                error={Boolean(createErrors.unit_id)}
+                helperText={createErrors.unit_id}
+                fullWidth
+              >
+                <MenuItem value="">เลือกหน่วยนับ</MenuItem>
+                {units.map((o) => (
+                  <MenuItem key={o.id} value={o.id}>
+                    {o.unit_code} - {o.unit_name}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-              {isLineBrowser ? (
-                <TextField
-                  select
-                  label="คลังเริ่มต้น *"
-                  value={createForm.storage_location_id}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setCreateForm((s) => ({ ...s, storage_location_id: nextId }));
-                    setSelectedLocation(locations.find((x) => x.id === nextId) ?? null);
-                    setCreateErrors((prev) => ({ ...prev, storage_location_id: undefined }));
-                  }}
-                  SelectProps={{ native: true }}
-                  error={Boolean(createErrors.storage_location_id)}
-                  helperText={createErrors.storage_location_id}
-                  fullWidth
-                >
-                  <option value="">เลือกคลังเริ่มต้น</option>
-                  {locations.map((o) => <option key={o.id} value={o.id}>{o.location_code} - {o.location_name}</option>)}
-                </TextField>
-              ) : (
-                <Autocomplete
-                  disablePortal
-                  options={locations}
-                  value={selectedLocation}
-                  onChange={(_, value) => {
-                    setSelectedLocation(value);
-                    setCreateForm((s) => ({ ...s, storage_location_id: value?.id ?? "" }));
-                    setCreateErrors((prev) => ({ ...prev, storage_location_id: undefined }));
-                  }}
-                  getOptionLabel={(o) => `${o.location_code} - ${o.location_name}`}
-                  isOptionEqualToValue={(a, b) => a.id === b.id}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="คลังเริ่มต้น *"
-                      error={Boolean(createErrors.storage_location_id)}
-                      helperText={createErrors.storage_location_id}
-                    />
-                  )}
-                />
-              )}
+              <TextField
+                select
+                label="คลังเริ่มต้น *"
+                value={createForm.storage_location_id}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setCreateForm((s) => ({ ...s, storage_location_id: nextId }));
+                  setCreateErrors((prev) => ({ ...prev, storage_location_id: undefined }));
+                }}
+                error={Boolean(createErrors.storage_location_id)}
+                helperText={createErrors.storage_location_id}
+                fullWidth
+              >
+                <MenuItem value="">เลือกคลังเริ่มต้น</MenuItem>
+                {locations.map((o) => (
+                  <MenuItem key={o.id} value={o.id}>
+                    {o.location_code} - {o.location_name}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <Stack direction="row" spacing={1}>
                 <TextField label="ต้นทุน" type="number" value={createForm.cost} onChange={(e) => setCreateForm((s) => ({ ...s, cost: Number(e.target.value) }))} fullWidth />

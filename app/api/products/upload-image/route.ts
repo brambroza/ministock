@@ -10,8 +10,14 @@ const BUCKET = "product-images";
 
 async function ensureBucket() {
   const { data } = await supabaseAdmin.storage.listBuckets();
-  const exists = (data ?? []).some((b) => b.name === BUCKET);
-  if (exists) return;
+  const bucket = (data ?? []).find((b) => b.name === BUCKET);
+  if (bucket) {
+    // ถ้า bucket เคยถูกสร้างเป็น private ให้ปรับเป็น public เพื่อให้ LIFF โหลดรูปได้
+    if (!bucket.public) {
+      await supabaseAdmin.storage.updateBucket(BUCKET, { public: true, fileSizeLimit: 5 * 1024 * 1024 });
+    }
+    return;
+  }
   await supabaseAdmin.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 5 * 1024 * 1024 });
 }
 
