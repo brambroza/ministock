@@ -25,6 +25,7 @@ import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
 import dayjs from "dayjs";
+import { normalizeImageUrl } from "@/lib/utils/image";
 
 type StockCardRow = {
   id: string;
@@ -170,7 +171,7 @@ export default function Page() {
                 <TableCell>{dayjs(r.movement_date).format("DD/MM/YYYY HH:mm")}</TableCell>
                 <TableCell>
                   <img
-                    src={r.products?.[0]?.image_url ?? "https://placehold.co/48x48?text=-"}
+                    src={normalizeImageUrl(r.products?.[0]?.image_url) ?? "https://placehold.co/48x48?text=-"}
                     alt={r.products?.[0]?.product_name ?? "product"}
                     style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                   />
@@ -213,7 +214,7 @@ export default function Page() {
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Stack direction="row" spacing={1} alignItems="center">
                     <img
-                      src={r.products?.[0]?.image_url ?? "https://placehold.co/48x48?text=-"}
+                      src={normalizeImageUrl(r.products?.[0]?.image_url) ?? "https://placehold.co/48x48?text=-"}
                       alt={r.products?.[0]?.product_name ?? "product"}
                       style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                     />

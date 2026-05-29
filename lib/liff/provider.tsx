@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
+import { Box, CircularProgress, Stack, Typography } from "@mui/material";
 import liff from "@line/liff";
 
 type LiffCtx = { initialized: boolean; lineUserId?: string };
@@ -7,6 +8,7 @@ const Ctx = createContext<LiffCtx>({ initialized: false });
 
 export function LiffProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<LiffCtx>({ initialized: false });
+
   useEffect(() => {
     const run = async () => {
       try {
@@ -15,6 +17,7 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
           liff.login();
           return;
         }
+
         const profile = await liff.getProfile();
         const idToken = liff.getIDToken() ?? undefined;
         const res = await fetch("/api/liff/session", {
@@ -41,9 +44,24 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
         setState({ initialized: true });
       }
     };
-    run();
+
+    void run();
   }, []);
+
+  if (!state.initialized) {
+    return (
+      <Box minHeight="70vh" display="grid" sx={{ placeItems: "center" }}>
+        <Stack spacing={1} alignItems="center">
+          <CircularProgress size={26} />
+          <Typography variant="body2" color="text.secondary">กำลังเชื่อมต่อ LINE...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
   return <Ctx.Provider value={state}>{children}</Ctx.Provider>;
 }
 
-export function useLiff() { return useContext(Ctx); }
+export function useLiff() {
+  return useContext(Ctx);
+}

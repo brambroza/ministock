@@ -23,6 +23,7 @@ import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import Link from "next/link";
 import type { Route } from "next";
 import { AppSnackbar } from "@/components/common/AppSnackbar";
+import { normalizeImageUrl } from "@/lib/utils/image";
 
 type OnHandRow = {
   product_id: string;
@@ -180,7 +181,7 @@ export default function Page() {
               <TableRow key={`${r.product_id}-${r.location_name}`} hover>
                 <TableCell>
                   <img
-                    src={r.image_url ?? "https://placehold.co/48x48?text=-"}
+                    src={normalizeImageUrl(r.image_url) ?? "https://placehold.co/48x48?text=-"}
                     alt={r.product_name}
                     style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                   />

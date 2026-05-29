@@ -22,6 +22,8 @@ import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import AddShoppingCartRoundedIcon from "@mui/icons-material/AddShoppingCartRounded";
 import QrCodeScannerRoundedIcon from "@mui/icons-material/QrCodeScannerRounded";
 import { BarcodeScanner } from "@/components/stock/BarcodeScanner";
+import { useLiff } from "@/lib/liff/provider";
+import { normalizeImageUrl } from "@/lib/utils/image";
 
 type Product = {
   id: string;
@@ -39,6 +41,7 @@ type UnitOption = { id: string; unit_code: string; unit_name: string };
 type LocationOption = { id: string; location_code: string; location_name: string };
 
 export default function Page() {
+  const { initialized } = useLiff();
   const [barcode, setBarcode] = useState("");
   const [scannerOpen, setScannerOpen] = useState(true);
   const [isLineBrowser, setIsLineBrowser] = useState(false);
@@ -47,6 +50,7 @@ export default function Page() {
   const [autoContinue, setAutoContinue] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [bootError, setBootError] = useState("");
 
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -103,11 +107,19 @@ export default function Page() {
   };
 
   useEffect(() => {
+    if (!initialized) return;
     setIsLineBrowser(/Line\//i.test(navigator.userAgent));
     Promise.all([
       fetch("/api/units", { cache: "no-store" }).then((r) => r.json()),
       fetch("/api/locations", { cache: "no-store" }).then((r) => r.json())
-    ]).then(([u, l]) => {
+    ])
+      .then(([u, l]) => {
+      if (!Array.isArray(u)) {
+        setBootError((u as { error?: string })?.error ?? "โหลดหน่วยนับไม่สำเร็จ");
+      }
+      if (!Array.isArray(l)) {
+        setBootError((l as { error?: string })?.error ?? "โหลดคลังสินค้าไม่สำเร็จ");
+      }
       const unitRows = Array.isArray(u) ? (u as UnitOption[]) : [];
       const locationRows = Array.isArray(l) ? (l as LocationOption[]) : [];
       setUnits(unitRows);
@@ -121,8 +133,11 @@ export default function Page() {
       if (locationRows.length > 0) {
         setCreateForm((s) => ({ ...s, storage_location_id: s.storage_location_id || locationRows[0].id }));
       }
-    });
-  }, []);
+      })
+      .catch(() => {
+        setBootError("โหลดข้อมูลตั้งต้นไม่สำเร็จ");
+      });
+  }, [initialized]);
 
   const locationId = useMemo(() => receiveLocationId ?? "", [receiveLocationId]);
 
@@ -355,6 +370,7 @@ export default function Page() {
       </Card>
 
       {message ? <Alert severity={message.type}>{message.text}</Alert> : null}
+      {bootError ? <Alert severity="error">{bootError}</Alert> : null}
 
       {foundProduct ? (
         <Card elevation={0} sx={{ border: "1px solid #d1fae5", borderRadius: 3, bgcolor: "#f0fdf4" }}>
@@ -364,7 +380,7 @@ export default function Page() {
               <Chip size="small" color="success" label="พบสินค้าในระบบ" />
             </Stack>
             <Typography variant="body2" color="text.secondary">รหัส: {foundProduct.barcode}</Typography>
-            {foundProduct.image_url ? <img src={foundProduct.image_url} alt={foundProduct.product_name} style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "1px solid #d1d5db", marginTop: 8 }} /> : null}
+            {foundProduct.image_url ? <img src={normalizeImageUrl(foundProduct.image_url) ?? undefined} alt={foundProduct.product_name} style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "1px solid #d1d5db", marginTop: 8 }} /> : null}
           </CardContent>
         </Card>
       ) : null}
@@ -452,7 +468,7 @@ export default function Page() {
                   }}
                 />
               </Button>
-              {createForm.image_url ? <img src={createForm.image_url} alt="preview" style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 12, border: "1px solid #e5e7eb" }} /> : null}
+              {createForm.image_url ? <img src={normalizeImageUrl(createForm.image_url) ?? undefined} alt="preview" style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 12, border: "1px solid #e5e7eb" }} /> : null}
               <TextField
                 label="ชื่อสินค้า *"
                 value={createForm.product_name}

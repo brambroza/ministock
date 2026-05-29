@@ -15,6 +15,7 @@ import {
 import dayjs from "dayjs";
 import { PageHeader, StatCard } from "@/components/common/Common";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeImageUrl } from "@/lib/utils/image";
 
 export default async function Page() {
   const supabase = await createClient();
@@ -108,7 +109,7 @@ export default async function Page() {
                 <TableRow key={`${r.product_id}-${r.location_name}`} hover>
                   <TableCell>
                     <img
-                      src={imageMap.get(r.product_id) ?? "https://placehold.co/48x48?text=-"}
+                      src={normalizeImageUrl(imageMap.get(r.product_id)) ?? "https://placehold.co/48x48?text=-"}
                       alt={r.product_name}
                       style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                     />
@@ -133,7 +134,7 @@ export default async function Page() {
               <CardContent>
                 <Stack direction="row" spacing={1.2} alignItems="center" mb={0.5}>
                   <img
-                    src={imageMap.get(r.product_id) ?? "https://placehold.co/52x52?text=-"}
+                    src={normalizeImageUrl(imageMap.get(r.product_id)) ?? "https://placehold.co/52x52?text=-"}
                     alt={r.product_name}
                     style={{ width: 52, height: 52, borderRadius: 10, objectFit: "cover", border: "1px solid #e5e7eb" }}
                   />
